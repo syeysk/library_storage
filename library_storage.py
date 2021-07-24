@@ -1,6 +1,6 @@
+import hashlib
 import os
 import sqlite3
-import hashlib
 
 
 def get_file_hash(file_path):
@@ -31,24 +31,37 @@ CREATE TABLE IF NOT EXISTS files (
 );
         ''')
 
-    def scan_to_db(self, library_path):
+    def scan_to_db(self, library_path) -> None:
+        os.chdir(library_path)
         sql = 'INSERT INTO files (hash, directory, filename) VALUES (?, ?, ?)'
         seq_sql_params = []
-        for directory, _, filenames in os.walk(library_path):
+        total_count_files = 0
+        for directory, _, filenames in os.walk('./'):
+            directory = directory[2:]
+            if os.path.sep == '\\':
+                directory = directory.replace('\\', '/')
+
             for filename in filenames:
                 file_hash = get_file_hash(os.path.join(directory, filename))
                 seq_sql_params.append((file_hash, directory, filename))
+                total_count_files += 1
                 if len(seq_sql_params) == self.DB_COUNT_ROWS_FOR_INSERT:
                     self.cu.executemany(sql, seq_sql_params)
                     seq_sql_params.clear()
 
-                print((file_hash, directory, filename))
+                #print((file_hash, directory, filename))
 
         if seq_sql_params:
             self.cu.executemany(sql, seq_sql_params)
             seq_sql_params.clear()
 
-    def export_db_to_csv(self):
+        print('Обнаружено файлов:', total_count_files, 'шт')
+
+    def export_db_to_csv(self) -> None:
+        """
+        Экспортирует из базы метаинформацию в CSV без заголовков. Формат строки следующий:
+        хэш,идентификатор,директория,имя файла
+        """
         total_rows_count = self.cu.execute('SELECT COUNT(id) AS total_rows_count FROM files').fetchone()
         total_rows_count = total_rows_count[0]
         count_pages = total_rows_count // self.DB_COUNT_ROWS_ON_PAGE
@@ -57,15 +70,30 @@ CREATE TABLE IF NOT EXISTS files (
 
         sql = 'SELECT hash, id, directory, filename FROM files LIMIT ?,?'
         offset = 0
+        total_count_files = 0
         for current_page in range(count_pages):
             sql_params = (offset, self.DB_COUNT_ROWS_ON_PAGE)
             rows = self.cu.execute(sql, sql_params).fetchall()
             offset += self.DB_COUNT_ROWS_ON_PAGE
             for row in rows:
-                print(row)
+                total_count_files += 1
+                #print(row)
 
-    def import_csv_to_db(self):
+        print('Экспортировано файлов:', total_count_files, 'шт')
+
+    def import_csv_to_db(self) -> None:
         ...
+
+    def check_diff(self, library_path) -> None:
+        """
+        Проверяет различия в двух базах. Выявляет следующие различия файлов:
+        - переименован/перемещён
+        - удалён
+        - добавлен
+        :param source_library_db:
+        :param library_path:
+        :return:
+        """
 
 
 if __name__ == '__main__':
