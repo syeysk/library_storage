@@ -19,8 +19,9 @@ def get_file_hash(file_path):
 class LibraryStorage:
     DB_COUNT_ROWS_FOR_INSERT = 100
     DB_COUNT_ROWS_ON_PAGE = 10
+    CSV_COUNT_ROWS_ON_PAGE = 20
 
-    def __init__(self, library_path, csv_path, db_path):
+    def __init__(self, library_path: str, csv_path: str, db_path: str) -> None:
         """
         Инициализирует класс хранилища
         :param library_path:
@@ -74,20 +75,36 @@ CREATE TABLE IF NOT EXISTS files (
         """
         total_rows_count = self.cu.execute('SELECT COUNT(id) AS total_rows_count FROM files').fetchone()
         total_rows_count = total_rows_count[0]
-        count_pages = total_rows_count // self.DB_COUNT_ROWS_ON_PAGE
+        db_count_pages = total_rows_count // self.DB_COUNT_ROWS_ON_PAGE
         if total_rows_count % self.DB_COUNT_ROWS_ON_PAGE > 0:
-            count_pages += 1
+            db_count_pages += 1
 
         sql = 'SELECT hash, id, directory, filename FROM files LIMIT ?,?'
         offset = 0
         total_count_files = 0
-        for current_page in range(count_pages):
+        csv_writer = None
+        csv_file = None
+        csv_current_page = 0
+        for _ in range(db_count_pages):
             sql_params = (offset, self.DB_COUNT_ROWS_ON_PAGE)
             rows = self.cu.execute(sql, sql_params).fetchall()
             offset += self.DB_COUNT_ROWS_ON_PAGE
             for row in rows:
+                if total_count_files % self.CSV_COUNT_ROWS_ON_PAGE == 0:
+                    if csv_file:
+                        csv_file.close()
+
+                    csv_current_page += 1
+                    csv_full_path = os.path.join(self.csv_path, '{}.csv'.format(str(csv_current_page)))
+                    csv_file = open(csv_full_path, 'w', encoding='utf-8', newline='\n')
+                    csv_writer = csv.writer(csv_file)
+
+                csv_writer.writerow(row)
                 total_count_files += 1
                 #print(row)
+
+        if csv_file:
+            csv_file.close()
 
         print('Экспортировано файлов:', total_count_files, 'шт')
 
