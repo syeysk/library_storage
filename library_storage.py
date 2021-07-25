@@ -111,6 +111,12 @@ if __name__ == '__main__':
     csv_path = os.path.join(os.path.dirname(__file__), 'csv_articles')
     db_path = ':memory:'
 
+    if not os.path.exists(csv_path):
+        os.makedirs(csv_path)
+    else:
+        if not os.path.isdir(csv_path):
+            raise Exception('Не я вляется директорией: csv_path =', csv_path)
+
     lib_storage = LibraryStorage(library_path=library_path, csv_path=csv_path, db_path=db_path)
     lib_storage.scan_to_db()
     lib_storage.export_db_to_csv()
