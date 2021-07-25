@@ -1,3 +1,4 @@
+import csv
 import hashlib
 import os
 import sqlite3
@@ -19,7 +20,13 @@ class LibraryStorage:
     DB_COUNT_ROWS_FOR_INSERT = 100
     DB_COUNT_ROWS_ON_PAGE = 10
 
-    def __init__(self, db_path=':memory:'):
+    def __init__(self, library_path, csv_path, db_path):
+        """
+        Инициализирует класс хранилища
+        :param library_path:
+        :param db_path:
+        :param name:
+        """
         self.c = sqlite3.connect(db_path)
         self.cu = self.c.cursor()
         self.cu.executescript('''
@@ -30,9 +37,12 @@ CREATE TABLE IF NOT EXISTS files (
     filename VARCHAR(255)
 );
         ''')
-
-    def scan_to_db(self, library_path) -> None:
+        self.csv_path = csv_path
+        self.library_path = library_path
         os.chdir(library_path)
+
+    def scan_to_db(self) -> None:
+        """Сканирует информацию о файлах в директории и заносит её в базу"""
         sql = 'INSERT INTO files (hash, directory, filename) VALUES (?, ?, ?)'
         seq_sql_params = []
         total_count_files = 0
@@ -98,7 +108,9 @@ CREATE TABLE IF NOT EXISTS files (
 
 if __name__ == '__main__':
     library_path = 'C:\\test\\Статьи'
+    csv_path = os.path.join(os.path.dirname(__file__), 'csv_articles')
+    db_path = ':memory:'
 
-    lib_storage = LibraryStorage()
-    lib_storage.scan_to_db(library_path)
+    lib_storage = LibraryStorage(library_path=library_path, csv_path=csv_path, db_path=db_path)
+    lib_storage.scan_to_db()
     lib_storage.export_db_to_csv()
