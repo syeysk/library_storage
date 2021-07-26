@@ -17,7 +17,7 @@ def get_file_hash(file_path):
 
 
 class DBStorage:
-    COUNT_ROWS_FOR_INSERT = 100
+    COUNT_ROWS_FOR_INSERT = 30
     COUNT_ROWS_ON_PAGE = 10
     SQL_INSERT_ROW = 'INSERT INTO files (hash, directory, filename) VALUES (?, ?, ?)'
     SQL_INSERT_ROW_WITH_ID = 'INSERT INTO files (hash, id, directory, filename) VALUES (?, ?, ?, ?)'
@@ -58,7 +58,19 @@ class DBStorage:
 
     def insert_rows(self, with_id: bool = True) -> None:
         sql = self.SQL_INSERT_ROW_WITH_ID if with_id else self.SQL_INSERT_ROW
-        self.cu.executemany(sql, self.seq_sql_params)
+        for sql_params in self.seq_sql_params:
+            file_hash = sql_params[0]
+            sql_select = 'SELECT id, directory, filename FROM files WHERE hash=?'
+            is_exists = self.cu.execute(sql_select, (file_hash,)).fetchone()
+            if not is_exists:
+                self.cu.execute(sql, sql_params)
+                print('Новый:', sql_params)
+            else:
+                print('Уже существует:', sql_params, '\n  Как', is_exists)
+        # try:
+        #     self.cu.executemany(sql, self.seq_sql_params)
+        # except sqlite3.IntegrityError as error:
+        #     print(error)
         self.c.commit()
         self.seq_sql_params.clear()
 
@@ -145,7 +157,7 @@ class LibraryStorage:
                 for csv_row in csv.reader(csv_file):
                     self.db.append_row(tuple(csv_row))
                     if self.db.is_ready_for_insert():
-                        self.db.insert_rows(False)
+                        self.db.insert_rows()
 
         self.db.insert_rows()
 
