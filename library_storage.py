@@ -62,11 +62,29 @@ class DBStorage:
             file_hash = sql_params[0]
             sql_select = 'SELECT id, directory, filename FROM files WHERE hash=?'
             is_exists = self.cu.execute(sql_select, (file_hash,)).fetchone()
+            inserted_directory, inserted_filename = sql_params[2 if with_id else 1:]
+            inserted_path = '{}/{}'.format(inserted_directory, inserted_filename)  # .removeprefix('/')
+            inserted_path = inserted_path[1:] if inserted_path.startswith('/') else inserted_path
             if not is_exists:
                 self.cu.execute(sql, sql_params)
-                print('Новый:', sql_params)
+                print('Новый:', inserted_path)
             else:
-                print('Уже существует:', sql_params, '\n  Как', is_exists)
+                existed_directory, existed_filename = is_exists[1:]
+                existed_path = '{}/{}'.format(existed_directory, existed_filename)  # .removeprefix('/')
+                existed_path = existed_path[1:] if existed_path.startswith('/') else existed_path
+                is_replaced = inserted_directory != existed_directory
+                is_renamed = inserted_filename != existed_filename
+                if is_replaced and not is_renamed:
+                    text = 'Переместили:'
+                elif not is_replaced and is_renamed:
+                    text = 'Переименовали'
+                elif is_replaced and is_renamed:
+                    text = 'Переместили и переимновали'
+                else:
+                    text = 'Дубль:'
+
+                print(text, existed_path, '->', inserted_path)
+
         # try:
         #     self.cu.executemany(sql, self.seq_sql_params)
         # except sqlite3.IntegrityError as error:
