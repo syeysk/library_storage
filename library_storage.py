@@ -56,7 +56,7 @@ class DBStorage:
     def is_ready_for_insert(self) -> bool:
         return len(self.seq_sql_params) == self.COUNT_ROWS_FOR_INSERT
 
-    def insert_rows(self, with_id: bool = True) -> None:
+    def insert_rows(self, with_id: bool = True, do_insert_new: bool = True) -> None:
         sql = self.SQL_INSERT_ROW_WITH_ID if with_id else self.SQL_INSERT_ROW
         for sql_params in self.seq_sql_params:
             file_hash = sql_params[0]
@@ -66,7 +66,8 @@ class DBStorage:
             inserted_path = '{}/{}'.format(inserted_directory, inserted_filename)  # .removeprefix('/')
             inserted_path = inserted_path[1:] if inserted_path.startswith('/') else inserted_path
             if not is_exists:
-                self.cu.execute(sql, sql_params)
+                if do_insert_new:
+                    self.cu.execute(sql, sql_params)
                 print('Новый:', inserted_path)
             else:
                 existed_directory, existed_filename = is_exists[1:]
