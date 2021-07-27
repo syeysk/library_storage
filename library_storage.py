@@ -56,7 +56,7 @@ class DBStorage:
     def is_ready_for_insert(self) -> bool:
         return len(self.seq_sql_params) == self.COUNT_ROWS_FOR_INSERT
 
-    def insert_rows(self, with_id: bool = True, do_insert_new: bool = True) -> None:
+    def insert_rows(self, with_id: bool = True, do_insert_new: bool = True, print_status: bool = True) -> None:
         sql = self.SQL_INSERT_ROW_WITH_ID if with_id else self.SQL_INSERT_ROW
         for sql_params in self.seq_sql_params:
             file_hash = sql_params[0]
@@ -68,7 +68,9 @@ class DBStorage:
             if not is_exists:
                 if do_insert_new:
                     self.cu.execute(sql, sql_params)
-                print('Новый:', inserted_path)
+
+                if print_status:
+                    print('Новый:', inserted_path)
             else:
                 existed_directory, existed_filename = is_exists[1:]
                 existed_path = '{}/{}'.format(existed_directory, existed_filename)  # .removeprefix('/')
@@ -82,9 +84,10 @@ class DBStorage:
                 elif is_replaced and is_renamed:
                     text = 'Переместили и переимновали'
                 else:
-                    text = 'Дубль:'
+                    text = 'Не тронут:'
 
-                print(text, existed_path, '->', inserted_path)
+                if print_status:
+                    print(text, existed_path, '->', inserted_path)
 
         # try:
         #     self.cu.executemany(sql, self.seq_sql_params)
@@ -121,8 +124,12 @@ class LibraryStorage:
         os.chdir(library_path)
         self.db = DBStorage(db_path=db_path)
 
-    def scan_to_db(self) -> None:
+    def scan_to_db(self, library_path=None) -> None:
         """Сканирует информацию о файлах в директории и заносит её в базу"""
+        if library_path is None:
+            library_path = self.library_path
+
+        os.chdir(library_path)
         total_count_files = 0
         for directory, _, filenames in os.walk('./'):
             directory = directory[2:]
@@ -176,14 +183,17 @@ class LibraryStorage:
                 for csv_row in csv.reader(csv_file):
                     self.db.append_row(tuple(csv_row))
                     if self.db.is_ready_for_insert():
-                        self.db.insert_rows()
+                        self.db.insert_rows(print_status=False)
 
-        self.db.insert_rows()
+        self.db.insert_rows(print_status=False)
 
 
 if __name__ == '__main__':
-    library_path = 'C:\\test\\Статьи'
-    csv_path = os.path.join(os.path.dirname(__file__), 'csv_articles')
+    repository_path = os.path.dirname(__file__)
+    #library_path = 'C:\\test\\Статьи'
+    library_path = os.path.join(repository_path, 'example_library_origin')
+    library_path_changed = os.path.join(repository_path, 'example_library_changed')
+    csv_path = os.path.join(repository_path, 'example_csv')
     db_path = ':memory:'
 
     if not os.path.exists(csv_path):
@@ -200,3 +210,5 @@ if __name__ == '__main__':
     print('Кол-во строк после очистки:', lib_storage.db.get_count_rows())
     lib_storage.import_csv_to_db()
     print('Кол-во строк после импорта:', lib_storage.db.get_count_rows())
+    print('Сканируем изменённую базу...')
+    lib_storage.scan_to_db(library_path=library_path_changed)
