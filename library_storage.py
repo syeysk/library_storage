@@ -23,6 +23,7 @@ class DBStorage:
     SQL_INSERT_ROW_WITH_ID = 'INSERT INTO files (hash, id, directory, filename) VALUES (?, ?, ?, ?)'
     SQL_SELECT_COUNT_ROWS = 'SELECT COUNT(id) FROM files'
     SQL_SELECT_ROWS = 'SELECT hash, id, directory, filename FROM files LIMIT ?,?'
+    SQL_SELECT_ROWS_ONLY_DELETED = 'SELECT hash, id, directory, filename FROM files WHERE is_deleted=1 LIMIT ?,?'
     SQL_CREATE_TABLE = '''
         CREATE TABLE IF NOT EXISTS files (
             hash VARCHAR(255) UNIQUE,
@@ -78,17 +79,15 @@ class DBStorage:
                 existed_path = existed_path[1:] if existed_path.startswith('/') else existed_path
                 is_replaced = inserted_directory != existed_directory
                 is_renamed = inserted_filename != existed_filename
-                if is_replaced and not is_renamed:
-                    text = 'Переместили:'
-                elif not is_replaced and is_renamed:
-                    text = 'Переименовали'
-                elif is_replaced and is_renamed:
-                    text = 'Переместили и переимновали'
-                else:
-                    text = 'Не тронут:'
-
                 if print_status:
-                    print(text, existed_path, '->', inserted_path)
+                    if is_replaced and not is_renamed:
+                        print('Переместили:', existed_path, '->', inserted_path)
+                    elif not is_replaced and is_renamed:
+                        print('Переименовали', existed_path, '->', inserted_path)
+                    elif is_replaced and is_renamed:
+                        print('Переместили и переимновали', existed_path, '->', inserted_path)
+                    else:
+                        print('Не тронут:', existed_path)
 
                 self.cu.execute('UPDATE files SET is_deleted=0 WHERE hash=?', (file_hash,))
 
@@ -99,11 +98,12 @@ class DBStorage:
         self.c.commit()
         self.seq_sql_params.clear()
 
-    def select_rows(self):
+    def select_rows(self, only_deleted=False):
+        sql = self.SQL_SELECT_ROWS_ONLY_DELETED if only_deleted else self.SQL_SELECT_ROWS
         count_pages = self.get_count_pages()
         for page_num in range(count_pages):
             sql_params = (page_num * self.COUNT_ROWS_ON_PAGE, self.COUNT_ROWS_ON_PAGE)
-            for row in self.cu.execute(self.SQL_SELECT_ROWS, sql_params).fetchall():
+            for row in self.cu.execute(sql, sql_params).fetchall():
                 yield row
 
     def set_is_deleted(self):
@@ -112,9 +112,11 @@ class DBStorage:
         self.c.commit()
 
     def print_deleted_files(self):
-        sql = 'UPDATE files SET is_deleted=1'
-        self.cu.execute(sql)
-        self.c.commit()
+        for row in self.select_rows(only_deleted=True):
+            existed_directory, existed_filename = row[2:]
+            existed_path = '{}/{}'.format(existed_directory, existed_filename)  # .removeprefix('/')
+            existed_path = existed_path[1:] if existed_path.startswith('/') else existed_path
+            print('Удалён:', existed_path)
 
 
 # sqlite3.IntegrityError: UNIQUE constraint failed: files.hash
@@ -135,6 +137,8 @@ class LibraryStorage:
 
     def scan_to_db(self, library_path=None) -> None:
         """Сканирует информацию о файлах в директории и заносит её в базу"""
+        self.db.set_is_deleted()
+
         if library_path is None:
             library_path = self.library_path
 
@@ -217,5 +221,7 @@ if __name__ == '__main__':
     print('Кол-во строк после очистки:', lib_storage.db.get_count_rows())
     lib_storage.import_csv_to_db()
     print('Кол-во строк после импорта:', lib_storage.db.get_count_rows())
-    print('Сканируем изменённую базу...')
+    print('\nСканируем изменённую базу...')
+    lib_storage.db.set_is_deleted()
     lib_storage.scan_to_db(library_path=library_path_changed)
+    lib_storage.db.print_deleted_files()
