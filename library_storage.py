@@ -28,7 +28,8 @@ class DBStorage:
             hash VARCHAR(255) UNIQUE,
             id INTEGER PRIMARY KEY,
             directory VARCHAR(255),
-            filename VARCHAR(255)
+            filename VARCHAR(255),
+            is_deleted INT NOT NULL DEFAULT 0
         );'''
 
     def __init__(self, db_path: str) -> None:
@@ -89,6 +90,8 @@ class DBStorage:
                 if print_status:
                     print(text, existed_path, '->', inserted_path)
 
+                self.cu.execute('UPDATE files SET is_deleted=0 WHERE hash=?', (file_hash,))
+
         # try:
         #     self.cu.executemany(sql, self.seq_sql_params)
         # except sqlite3.IntegrityError as error:
@@ -96,16 +99,22 @@ class DBStorage:
         self.c.commit()
         self.seq_sql_params.clear()
 
-    def select_rows(self, offset) -> list:
-        sql_params = (offset, self.COUNT_ROWS_ON_PAGE)
-        return self.cu.execute(self.SQL_SELECT_ROWS, sql_params).fetchall()
-
-    def select_pages(self):
+    def select_rows(self):
         count_pages = self.get_count_pages()
-        offset = 0
-        for _ in range(count_pages):
-            yield self.select_rows(offset)
-            offset += self.COUNT_ROWS_ON_PAGE
+        for page_num in range(count_pages):
+            sql_params = (page_num * self.COUNT_ROWS_ON_PAGE, self.COUNT_ROWS_ON_PAGE)
+            for row in self.cu.execute(self.SQL_SELECT_ROWS, sql_params).fetchall():
+                yield row
+
+    def set_is_deleted(self):
+        sql = 'UPDATE files SET is_deleted=1'
+        self.cu.execute(sql)
+        self.c.commit()
+
+    def print_deleted_files(self):
+        sql = 'UPDATE files SET is_deleted=1'
+        self.cu.execute(sql)
+        self.c.commit()
 
 
 # sqlite3.IntegrityError: UNIQUE constraint failed: files.hash
@@ -153,24 +162,22 @@ class LibraryStorage:
         Экспортирует из базы метаинформацию в CSV без заголовков. Формат строки следующий:
         хэш,идентификатор,директория,имя файла
         """
-        total_count_files = 0
         csv_writer = None
         csv_file = None
         csv_current_page = 0
-        for db_rows in self.db.select_pages():
-            for row in db_rows:
-                if total_count_files % self.CSV_COUNT_ROWS_ON_PAGE == 0:
-                    if csv_file:
-                        csv_file.close()
+        total_count_files = None
+        for total_count_files, row in enumerate(self.db.select_rows()):
+            if total_count_files % self.CSV_COUNT_ROWS_ON_PAGE == 0:
+                if csv_file:
+                    csv_file.close()
 
-                    csv_current_page += 1
-                    csv_full_path = os.path.join(self.csv_path, '{}.csv'.format(str(csv_current_page)))
-                    csv_file = open(csv_full_path, 'w', encoding='utf-8', newline='\n')
-                    csv_writer = csv.writer(csv_file)
+                csv_current_page += 1
+                csv_full_path = os.path.join(self.csv_path, '{}.csv'.format(str(csv_current_page)))
+                csv_file = open(csv_full_path, 'w', encoding='utf-8', newline='\n')
+                csv_writer = csv.writer(csv_file)
 
-                csv_writer.writerow(row)
-                total_count_files += 1
-                #print(row)
+            csv_writer.writerow(row)
+            #print(row)
 
         if csv_file:
             csv_file.close()
