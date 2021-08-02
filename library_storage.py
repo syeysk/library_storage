@@ -2,6 +2,7 @@ import csv
 import hashlib
 import os
 import sqlite3
+import zipfile
 
 
 def get_file_hash(file_path):
@@ -108,8 +109,13 @@ class DBStorage:
 class LibraryStorage:
     CSV_COUNT_ROWS_ON_PAGE = 20
     DIFF_FILE_NAME = 'diff.csv'
+    STATUS_NEW = 'Новый'
+    STATUS_MOVED = 'Переместили'
+    STATUS_RENAMED = 'Переименовали'
+    STATUS_MOVED_AND_REPLACED = 'Переместили и переименовали'
+    STATUS_UNTOUCHED = 'Не тронут'
 
-    def __init__(self, library_path: str, csv_path: str, db_path: str, diff_path: str) -> None:
+    def __init__(self, library_path: str, csv_path: str, db_path: str, diff_path: str, diff_file_path: str) -> None:
         """
         Инициализирует класс хранилища
         :param library_path:
@@ -121,6 +127,9 @@ class LibraryStorage:
         self.diff_path = diff_path
         os.chdir(library_path)
         self.db = DBStorage(db_path=db_path)
+        self.diff_file_path = diff_file_path
+        self.diff_csv = None
+        self.diff_zip = None
 
     def __enter__(self):
         return self
@@ -128,14 +137,33 @@ class LibraryStorage:
     def __exit__(self, _1, _2, _3):
         self.db.c.close()
 
-    def scan_to_db(self, library_path=None) -> None:
+    def scan_to_db(self, library_path=None, make_diff_zip=False) -> None:
         """Сканирует информацию о файлах в директории и заносит её в базу"""
+        def print_file_status(inserted_directory, inserted_filename, is_exists, existed_directory, existed_filename):
+            status, existed_path, inserted_path = self.print_file_status(
+                inserted_directory,
+                inserted_filename,
+                is_exists,
+                existed_directory,
+                existed_filename
+            )
+            if status != self.STATUS_UNTOUCHED:
+                self.diff_csv.writerow((status, existed_path, inserted_path))
+            if make_diff_zip and status == self.STATUS_NEW:
+                diff_zip.write(os.path.join(library_path, inserted_path), inserted_path)
+
         self.db.set_is_deleted()
         if library_path is None:
             library_path = self.library_path
 
-        with open(os.path.join(self.diff_path, self.DIFF_FILE_NAME), 'w', encoding='utf-8', newline='\n') as diff_file:
+        diff_zip = None
+        if make_diff_zip:
+            diff_zip = zipfile.ZipFile(self.diff_file_path, 'w')
+
+        diff_file_path = os.path.join(self.diff_path, self.DIFF_FILE_NAME)
+        with open(diff_file_path, 'w', encoding='utf-8', newline='\n') as diff_file:
             self.diff_csv = csv.writer(diff_file)
+
             os.chdir(library_path)
             total_count_files = 0
             for directory, _, filenames in os.walk('./'):
@@ -148,13 +176,15 @@ class LibraryStorage:
                     self.db.append_row((file_hash, directory, filename))
                     total_count_files += 1
                     if self.db.is_ready_for_insert():
-                        self.db.insert_rows(with_id=False, func=self.print_file_status)
+                        self.db.insert_rows(with_id=False, func=print_file_status)
 
-                    #print((file_hash, directory, filename))
-
-            self.db.insert_rows(with_id=False, func=self.print_file_status)
+            self.db.insert_rows(with_id=False, func=print_file_status)
             self.db.print_deleted_files(func=self.diff_csv.writerow)
             print('Обнаружено файлов:', total_count_files, 'шт')
+
+        if make_diff_zip:
+            diff_zip.write(diff_file_path, 'diff.csv')
+            diff_zip.close()
 
     def export_db_to_csv(self) -> None:
         """
@@ -176,7 +206,6 @@ class LibraryStorage:
                 csv_writer = csv.writer(csv_file)
 
             csv_writer.writerow(row)
-            #print(row)
 
         if csv_file:
             csv_file.close()
@@ -197,22 +226,21 @@ class LibraryStorage:
         inserted_path = '{}/{}'.format(inserted_directory, inserted_filename)  # .removeprefix('/')
         inserted_path = inserted_path[1:] if inserted_path.startswith('/') else inserted_path
         if not is_exists:
-            func_row = ('Новый', inserted_path)
+            return self.STATUS_NEW, None, inserted_path
         else:
             existed_path = '{}/{}'.format(existed_directory, existed_filename)  # .removeprefix('/')
             existed_path = existed_path[1:] if existed_path.startswith('/') else existed_path
             is_replaced = inserted_directory != existed_directory
             is_renamed = inserted_filename != existed_filename
             if is_replaced and not is_renamed:
-                func_row = ('Переместили', existed_path, '->', inserted_path)
+                return self.STATUS_MOVED, existed_path, inserted_path
             elif not is_replaced and is_renamed:
-                func_row = ('Переименовали', existed_path, '->', inserted_path)
+                return self.STATUS_RENAMED, existed_path, inserted_path
             elif is_replaced and is_renamed:
-                func_row = ('Переместили и переименовали', existed_path, '->', inserted_path)
-            else:
-                func_row = ('Не тронут', existed_path)
+                return self.STATUS_MOVED_AND_REPLACED, existed_path, inserted_path
 
-        self.diff_csv.writerow(func_row)
+            return self.STATUS_UNTOUCHED, existed_path, inserted_path
+
 
 if __name__ == '__main__':
     repository_path = os.path.dirname(__file__)
@@ -221,6 +249,7 @@ if __name__ == '__main__':
     library_path_changed = os.path.join(repository_path, 'example_library_changed')
     csv_path = os.path.join(repository_path, 'example_csv')
     diff_path = os.path.join(repository_path, 'example_diff')
+    diff_file_path = os.path.join(diff_path, 'example_diff.zip')
     db_path = ':memory:'
 
     if not os.path.exists(csv_path):
@@ -235,7 +264,7 @@ if __name__ == '__main__':
         if not os.path.isdir(diff_path):
             raise Exception('Не является директорией: diff_path =', diff_path)
 
-    with LibraryStorage(library_path=library_path, csv_path=csv_path, db_path=db_path, diff_path=diff_path) as lib_storage:
+    with LibraryStorage(library_path=library_path, csv_path=csv_path, db_path=db_path, diff_path=diff_path, diff_file_path=diff_file_path) as lib_storage:
         lib_storage.scan_to_db()
         lib_storage.export_db_to_csv()
         print('Кол-во строк до очистки:', lib_storage.db.get_count_rows())
@@ -244,4 +273,4 @@ if __name__ == '__main__':
         lib_storage.import_csv_to_db()
         print('Кол-во строк после импорта:', lib_storage.db.get_count_rows())
         print('\nСканируем изменённую базу...')
-        lib_storage.scan_to_db(library_path=library_path_changed)
+        lib_storage.scan_to_db(library_path=library_path_changed, make_diff_zip=True)
