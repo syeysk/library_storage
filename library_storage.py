@@ -59,39 +59,23 @@ class DBStorage:
     def is_ready_for_insert(self) -> bool:
         return len(self.seq_sql_params) == self.COUNT_ROWS_FOR_INSERT
 
-    def insert_rows(self, with_id: bool = True, do_insert_new: bool = True, func=None) -> None:
+    def insert_rows(self, with_id: bool = True, do_insert_new: bool = True, func=None) -> tuple:
         sql = self.SQL_INSERT_ROW_WITH_ID if with_id else self.SQL_INSERT_ROW
         for sql_params in self.seq_sql_params:
             file_hash = sql_params[0]
             sql_select = 'SELECT id, directory, filename FROM files WHERE hash=?'
             is_exists = self.cu.execute(sql_select, (file_hash,)).fetchone()
             inserted_directory, inserted_filename = sql_params[2 if with_id else 1:]
-            inserted_path = '{}/{}'.format(inserted_directory, inserted_filename)  # .removeprefix('/')
-            inserted_path = inserted_path[1:] if inserted_path.startswith('/') else inserted_path
+            existed_directory, existed_filename = None, None
             if not is_exists:
                 if do_insert_new:
                     self.cu.execute(sql, sql_params)
-
-                func_row = ('Новый', inserted_path)
             else:
                 existed_directory, existed_filename = is_exists[1:]
-                existed_path = '{}/{}'.format(existed_directory, existed_filename)  # .removeprefix('/')
-                existed_path = existed_path[1:] if existed_path.startswith('/') else existed_path
-                is_replaced = inserted_directory != existed_directory
-                is_renamed = inserted_filename != existed_filename
-                if is_replaced and not is_renamed:
-                    func_row = ('Переместили', existed_path, '->', inserted_path)
-                elif not is_replaced and is_renamed:
-                    func_row = ('Переименовали', existed_path, '->', inserted_path)
-                elif is_replaced and is_renamed:
-                    func_row = ('Переместили и переименовали', existed_path, '->', inserted_path)
-                else:
-                    func_row = ('Не тронут', existed_path)
-
                 self.cu.execute('UPDATE files SET is_deleted=0 WHERE hash=?', (file_hash,))
 
             if func:
-                func(func_row)
+                func(inserted_directory, inserted_filename, is_exists, existed_directory, existed_filename)
 
         # try:
         #     self.cu.executemany(sql, self.seq_sql_params)
@@ -151,7 +135,7 @@ class LibraryStorage:
             library_path = self.library_path
 
         with open(os.path.join(self.diff_path, self.DIFF_FILE_NAME), 'w', encoding='utf-8', newline='\n') as diff_file:
-            diff_csv = csv.writer(diff_file)
+            self.diff_csv = csv.writer(diff_file)
             os.chdir(library_path)
             total_count_files = 0
             for directory, _, filenames in os.walk('./'):
@@ -164,12 +148,12 @@ class LibraryStorage:
                     self.db.append_row((file_hash, directory, filename))
                     total_count_files += 1
                     if self.db.is_ready_for_insert():
-                        self.db.insert_rows(with_id=False, func=diff_csv.writerow)
+                        self.db.insert_rows(with_id=False, func=self.print_file_status)
 
                     #print((file_hash, directory, filename))
 
-            self.db.insert_rows(with_id=False, func=diff_csv.writerow)
-            self.db.print_deleted_files(func=diff_csv.writerow)
+            self.db.insert_rows(with_id=False, func=self.print_file_status)
+            self.db.print_deleted_files(func=self.diff_csv.writerow)
             print('Обнаружено файлов:', total_count_files, 'шт')
 
     def export_db_to_csv(self) -> None:
@@ -209,6 +193,26 @@ class LibraryStorage:
 
         self.db.insert_rows()
 
+    def print_file_status(self, inserted_directory, inserted_filename, is_exists, existed_directory, existed_filename):
+        inserted_path = '{}/{}'.format(inserted_directory, inserted_filename)  # .removeprefix('/')
+        inserted_path = inserted_path[1:] if inserted_path.startswith('/') else inserted_path
+        if not is_exists:
+            func_row = ('Новый', inserted_path)
+        else:
+            existed_path = '{}/{}'.format(existed_directory, existed_filename)  # .removeprefix('/')
+            existed_path = existed_path[1:] if existed_path.startswith('/') else existed_path
+            is_replaced = inserted_directory != existed_directory
+            is_renamed = inserted_filename != existed_filename
+            if is_replaced and not is_renamed:
+                func_row = ('Переместили', existed_path, '->', inserted_path)
+            elif not is_replaced and is_renamed:
+                func_row = ('Переименовали', existed_path, '->', inserted_path)
+            elif is_replaced and is_renamed:
+                func_row = ('Переместили и переименовали', existed_path, '->', inserted_path)
+            else:
+                func_row = ('Не тронут', existed_path)
+
+        self.diff_csv.writerow(func_row)
 
 if __name__ == '__main__':
     repository_path = os.path.dirname(__file__)
