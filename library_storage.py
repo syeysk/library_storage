@@ -102,10 +102,9 @@ class DBStorage:
             existed_directory, existed_filename = row[2:]
             existed_path = '{}/{}'.format(existed_directory, existed_filename)  # .removeprefix('/')
             existed_path = existed_path[1:] if existed_path.startswith('/') else existed_path
-            func(('Удалён', existed_path))
+            func(('Удалён', existed_path, None))
 
 
-# sqlite3.IntegrityError: UNIQUE constraint failed: files.hash
 class LibraryStorage:
     CSV_COUNT_ROWS_ON_PAGE = 20
     DIFF_FILE_NAME = 'diff.csv'
@@ -160,8 +159,8 @@ class LibraryStorage:
         if make_diff_zip:
             diff_zip = zipfile.ZipFile(self.diff_file_path, 'w')
 
-        diff_file_path = os.path.join(self.diff_path, self.DIFF_FILE_NAME)
-        with open(diff_file_path, 'w', encoding='utf-8', newline='\n') as diff_file:
+        diff_file_csv_path = os.path.join(self.diff_path, self.DIFF_FILE_NAME)
+        with open(diff_file_csv_path, 'w', encoding='utf-8', newline='\n') as diff_file:
             self.diff_csv = csv.writer(diff_file)
 
             os.chdir(library_path)
@@ -183,7 +182,7 @@ class LibraryStorage:
             print('Обнаружено файлов:', total_count_files, 'шт')
 
         if make_diff_zip:
-            diff_zip.write(diff_file_path, 'diff.csv')
+            diff_zip.write(diff_file_csv_path, self.DIFF_FILE_NAME)
             diff_zip.close()
 
     def export_db_to_csv(self) -> None:
@@ -221,6 +220,20 @@ class LibraryStorage:
                         self.db.insert_rows()
 
         self.db.insert_rows()
+
+    def apply_diff(self, diff_file_zip_path=None):
+        if diff_file_zip_path is None:
+            diff_file_zip_path = self.diff_file_path
+
+        with zipfile.ZipFile(diff_file_zip_path, 'r') as diff_zip:
+            diff_zip.testzip()
+            with diff_zip.open(self.DIFF_FILE_NAME, 'r') as diff_file:
+                diff_csv = csv.reader(diff_file.readlines())
+                #for status, existed_file, inserted_file in diff_csv:
+                for row in diff_csv:
+                    print(':::', row)
+
+                diff_file.close()
 
     def print_file_status(self, inserted_directory, inserted_filename, is_exists, existed_directory, existed_filename):
         inserted_path = '{}/{}'.format(inserted_directory, inserted_filename)  # .removeprefix('/')
@@ -264,7 +277,13 @@ if __name__ == '__main__':
         if not os.path.isdir(diff_path):
             raise Exception('Не является директорией: diff_path =', diff_path)
 
-    with LibraryStorage(library_path=library_path, csv_path=csv_path, db_path=db_path, diff_path=diff_path, diff_file_path=diff_file_path) as lib_storage:
+    with LibraryStorage(
+            library_path=library_path,
+            csv_path=csv_path,
+            db_path=db_path,
+            diff_path=diff_path,
+            diff_file_path=diff_file_path
+    ) as lib_storage:
         lib_storage.scan_to_db()
         lib_storage.export_db_to_csv()
         print('Кол-во строк до очистки:', lib_storage.db.get_count_rows())
@@ -274,3 +293,4 @@ if __name__ == '__main__':
         print('Кол-во строк после импорта:', lib_storage.db.get_count_rows())
         print('\nСканируем изменённую базу...')
         lib_storage.scan_to_db(library_path=library_path_changed, make_diff_zip=True)
+        lib_storage.apply_diff()
