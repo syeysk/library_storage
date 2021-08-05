@@ -3,6 +3,7 @@ import hashlib
 import os
 import sqlite3
 import zipfile
+from io import TextIOWrapper
 
 
 def get_file_hash(file_path):
@@ -228,10 +229,10 @@ class LibraryStorage:
         with zipfile.ZipFile(diff_file_zip_path, 'r') as diff_zip:
             diff_zip.testzip()
             with diff_zip.open(self.DIFF_FILE_NAME, 'r') as diff_file:
-                diff_csv = csv.reader(diff_file.readlines())
-                #for status, existed_file, inserted_file in diff_csv:
-                for row in diff_csv:
-                    print(':::', row)
+                diff_file_io = TextIOWrapper(diff_file, encoding='utf-8')
+                diff_csv = csv.reader(diff_file_io)
+                for status, existed_file, inserted_file in diff_csv:
+                    print(':::', status, existed_file, inserted_file)
 
                 diff_file.close()
 
