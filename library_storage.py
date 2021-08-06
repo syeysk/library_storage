@@ -229,7 +229,6 @@ class LibraryStorage:
                 diff_file_io = TextIOWrapper(diff_file, encoding='utf-8')
                 diff_csv = csv.reader(diff_file_io)
                 for status, existed_file, inserted_file in diff_csv:
-                    print(':::', status, existed_file, inserted_file)
                     if existed_file:
                         full_existed_path = os.path.join(library_path, existed_file)
                         full_existed_path = os.path.normpath(full_existed_path)
