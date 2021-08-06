@@ -234,7 +234,7 @@ class LibraryStorage:
                         full_existed_path = os.path.join(library_path, existed_file)
                         full_existed_path = os.path.normpath(full_existed_path)
 
-                    if full_inserted_path:
+                    if inserted_file:
                         full_inserted_path = os.path.join(library_path, inserted_file)
                         full_inserted_path = os.path.normpath(full_inserted_path)
 
@@ -242,7 +242,7 @@ class LibraryStorage:
                         if os.path.exists(full_inserted_path):
                             print('Файл существует:', full_inserted_path)
 
-                        diff_zip.extract(inserted_file, full_inserted_path)
+                        diff_zip.extract(inserted_file, os.path.dirname(full_inserted_path))
                     elif status == STATUS_DELETED:
                         os.unlink(full_existed_path)
                     elif status in (STATUS_MOVED, STATUS_RENAMED, STATUS_MOVED_AND_RENAMED):
@@ -308,18 +308,24 @@ if __name__ == '__main__':
         print('Кол-во строк после импорта:', lib_storage.db.get_count_rows())
         print('\nСканируем изменённую базу...')
         lib_storage.scan_to_db(library_path=library_path_changed, make_diff_zip=True)
-
         library_path_copy = '{}_copy'.format(library_path)
-        for directory, _, filenames in os.walk(library_path):
+        for directory_path, directories, filenames in os.walk(library_path):
+            directory_copy = directory_path[len(library_path)+1:]
+            directory_copy = os.path.join(library_path_copy, directory_copy)
             for filename in filenames:
-                directory_copy = directory[len(library_path):]
-                directory_copy = os.path.join(library_path_copy, directory_copy)
-                file_path = os.path.join(directory, filename)
-                file_path_copy = os.path.join(directory_copy, filename)
-                if os.path.isdir(file_path):
+                file_path = os.path.normpath(os.path.join(directory_path, filename))
+                file_path_copy = os.path.normpath(os.path.join(directory_copy, filename))
+                dirname_copy = os.path.dirname(file_path_copy)
+                if not os.path.exists(dirname_copy):
+                    os.makedirs(dirname_copy)
+
+                with open(file_path, 'rb') as file_orig, open(file_path_copy, 'wb') as file_copy:
+                    file_copy.write(file_orig.read())
+
+            for directory in directories:
+                file_path = os.path.normpath(os.path.join(directory_path, directory))
+                file_path_copy = os.path.normpath(os.path.join(directory_copy, directory))
+                if not os.path.exists(file_path_copy):
                     os.makedirs(file_path_copy)
-                elif os.path.isfile(file_path):
-                    with open(file_path, 'rb') as file_orig, open(file_path_copy, 'wb') as file_copy:
-                        file_copy.write(file_orig.read())
 
         lib_storage.apply_diff(library_path=library_path_copy)
