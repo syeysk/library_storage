@@ -6,6 +6,14 @@ import zipfile
 from io import TextIOWrapper
 
 
+STATUS_NEW = 'Новый'
+STATUS_MOVED = 'Переместили'
+STATUS_RENAMED = 'Переименовали'
+STATUS_MOVED_AND_RENAMED = 'Переместили и переименовали'
+STATUS_UNTOUCHED = 'Не тронут'
+STATUS_DELETED = 'Удалён'
+
+
 def get_file_hash(file_path):
     BLOCKSIZE = 65536
     hasher = hashlib.md5()
@@ -103,17 +111,12 @@ class DBStorage:
             existed_directory, existed_filename = row[2:]
             existed_path = '{}/{}'.format(existed_directory, existed_filename)  # .removeprefix('/')
             existed_path = existed_path[1:] if existed_path.startswith('/') else existed_path
-            func(('Удалён', existed_path, None))
+            func((STATUS_DELETED, existed_path, None))
 
 
 class LibraryStorage:
     CSV_COUNT_ROWS_ON_PAGE = 20
     DIFF_FILE_NAME = 'diff.csv'
-    STATUS_NEW = 'Новый'
-    STATUS_MOVED = 'Переместили'
-    STATUS_RENAMED = 'Переименовали'
-    STATUS_MOVED_AND_REPLACED = 'Переместили и переименовали'
-    STATUS_UNTOUCHED = 'Не тронут'
 
     def __init__(self, library_path: str, csv_path: str, db_path: str, diff_path: str, diff_file_path: str) -> None:
         """
@@ -147,19 +150,14 @@ class LibraryStorage:
                 existed_directory,
                 existed_filename
             )
-            if status != self.STATUS_UNTOUCHED:
+            if status != STATUS_UNTOUCHED:
                 self.diff_csv.writerow((status, existed_path, inserted_path))
-            if make_diff_zip and status == self.STATUS_NEW:
+            if make_diff_zip and status == STATUS_NEW:
                 diff_zip.write(os.path.join(library_path, inserted_path), inserted_path)
 
         self.db.set_is_deleted()
-        if library_path is None:
-            library_path = self.library_path
-
-        diff_zip = None
-        if make_diff_zip:
-            diff_zip = zipfile.ZipFile(self.diff_file_path, 'w')
-
+        library_path = self.library_path if library_path is None else library_path
+        diff_zip = zipfile.ZipFile(self.diff_file_path, 'w') if make_diff_zip else None
         diff_file_csv_path = os.path.join(self.diff_path, self.DIFF_FILE_NAME)
         with open(diff_file_csv_path, 'w', encoding='utf-8', newline='\n') as diff_file:
             self.diff_csv = csv.writer(diff_file)
@@ -222,10 +220,9 @@ class LibraryStorage:
 
         self.db.insert_rows()
 
-    def apply_diff(self, diff_file_zip_path=None):
-        if diff_file_zip_path is None:
-            diff_file_zip_path = self.diff_file_path
-
+    def apply_diff(self, diff_file_zip_path=None, library_path=None):
+        diff_file_zip_path = self.diff_file_path if diff_file_zip_path is None else diff_file_zip_path
+        library_path = self.library_path if library_path is None else library_path
         with zipfile.ZipFile(diff_file_zip_path, 'r') as diff_zip:
             diff_zip.testzip()
             with diff_zip.open(self.DIFF_FILE_NAME, 'r') as diff_file:
@@ -233,6 +230,23 @@ class LibraryStorage:
                 diff_csv = csv.reader(diff_file_io)
                 for status, existed_file, inserted_file in diff_csv:
                     print(':::', status, existed_file, inserted_file)
+                    if existed_file:
+                        full_existed_path = os.path.join(library_path, existed_file)
+                        full_existed_path = os.path.normpath(full_existed_path)
+
+                    if full_inserted_path:
+                        full_inserted_path = os.path.join(library_path, inserted_file)
+                        full_inserted_path = os.path.normpath(full_inserted_path)
+
+                    if status == STATUS_NEW:
+                        if os.path.exists(full_inserted_path):
+                            print('Файл существует:', full_inserted_path)
+
+                        diff_zip.extract(inserted_file, full_inserted_path)
+                    elif status == STATUS_DELETED:
+                        os.unlink(full_existed_path)
+                    elif status in (STATUS_MOVED, STATUS_RENAMED, STATUS_MOVED_AND_RENAMED):
+                        os.rename(full_existed_path, full_inserted_path)
 
                 diff_file.close()
 
@@ -240,20 +254,20 @@ class LibraryStorage:
         inserted_path = '{}/{}'.format(inserted_directory, inserted_filename)  # .removeprefix('/')
         inserted_path = inserted_path[1:] if inserted_path.startswith('/') else inserted_path
         if not is_exists:
-            return self.STATUS_NEW, None, inserted_path
+            return STATUS_NEW, None, inserted_path
         else:
             existed_path = '{}/{}'.format(existed_directory, existed_filename)  # .removeprefix('/')
             existed_path = existed_path[1:] if existed_path.startswith('/') else existed_path
             is_replaced = inserted_directory != existed_directory
             is_renamed = inserted_filename != existed_filename
             if is_replaced and not is_renamed:
-                return self.STATUS_MOVED, existed_path, inserted_path
+                return STATUS_MOVED, existed_path, inserted_path
             elif not is_replaced and is_renamed:
-                return self.STATUS_RENAMED, existed_path, inserted_path
+                return STATUS_RENAMED, existed_path, inserted_path
             elif is_replaced and is_renamed:
-                return self.STATUS_MOVED_AND_REPLACED, existed_path, inserted_path
+                return STATUS_MOVED_AND_RENAMED, existed_path, inserted_path
 
-            return self.STATUS_UNTOUCHED, existed_path, inserted_path
+            return STATUS_UNTOUCHED, existed_path, inserted_path
 
 
 if __name__ == '__main__':
@@ -294,4 +308,18 @@ if __name__ == '__main__':
         print('Кол-во строк после импорта:', lib_storage.db.get_count_rows())
         print('\nСканируем изменённую базу...')
         lib_storage.scan_to_db(library_path=library_path_changed, make_diff_zip=True)
-        lib_storage.apply_diff()
+
+        library_path_copy = '{}_copy'.format(library_path)
+        for directory, _, filenames in os.walk(library_path):
+            for filename in filenames:
+                directory_copy = directory[len(library_path):]
+                directory_copy = os.path.join(library_path_copy, directory_copy)
+                file_path = os.path.join(directory, filename)
+                file_path_copy = os.path.join(directory_copy, filename)
+                if os.path.isdir(file_path):
+                    os.makedirs(file_path_copy)
+                elif os.path.isfile(file_path):
+                    with open(file_path, 'rb') as file_orig, open(file_path_copy, 'wb') as file_copy:
+                        file_copy.write(file_orig.read())
+
+        lib_storage.apply_diff(library_path=library_path_copy)
