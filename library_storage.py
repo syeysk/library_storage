@@ -116,7 +116,7 @@ class DBStorage:
 
 class LibraryStorage:
     CSV_COUNT_ROWS_ON_PAGE = 20
-    DIFF_FILE_NAME = 'diff.csv'
+    ARCHIVE_DIFF_FILE_NAME = 'diff.csv'
 
     def __init__(self, library_path: str, csv_path: str, db_path: str, diff_path: str, diff_file_path: str) -> None:
         """
@@ -133,6 +133,7 @@ class LibraryStorage:
         self.diff_file_path = diff_file_path
         self.diff_csv = None
         self.diff_zip = None
+        self.temp_diff_file = os.path.expandvars(os.path.join('%TEMP%', self.ARCHIVE_DIFF_FILE_NAME))
 
     def __enter__(self):
         return self
@@ -158,8 +159,7 @@ class LibraryStorage:
         self.db.set_is_deleted()
         library_path = self.library_path if library_path is None else library_path
         diff_zip = zipfile.ZipFile(self.diff_file_path, 'w') if make_diff_zip else None
-        diff_file_csv_path = os.path.join(self.diff_path, self.DIFF_FILE_NAME)
-        with open(diff_file_csv_path, 'w', encoding='utf-8', newline='\n') as diff_file:
+        with open(self.temp_diff_file, 'w', encoding='utf-8', newline='\n') as diff_file:
             self.diff_csv = csv.writer(diff_file)
 
             os.chdir(library_path)
@@ -181,7 +181,7 @@ class LibraryStorage:
             print('Обнаружено файлов:', total_count_files, 'шт')
 
         if make_diff_zip:
-            diff_zip.write(diff_file_csv_path, self.DIFF_FILE_NAME)
+            diff_zip.write(self.temp_diff_file, self.ARCHIVE_DIFF_FILE_NAME)
             diff_zip.close()
 
     def export_db_to_csv(self) -> None:
@@ -225,7 +225,7 @@ class LibraryStorage:
         library_path = self.library_path if library_path is None else library_path
         with zipfile.ZipFile(diff_file_zip_path, 'r') as diff_zip:
             diff_zip.testzip()
-            with diff_zip.open(self.DIFF_FILE_NAME, 'r') as diff_file:
+            with diff_zip.open(self.ARCHIVE_DIFF_FILE_NAME, 'r') as diff_file:
                 diff_file_io = TextIOWrapper(diff_file, encoding='utf-8')
                 diff_csv = csv.reader(diff_file_io)
                 for status, existed_file, inserted_file in diff_csv:
@@ -239,12 +239,15 @@ class LibraryStorage:
 
                     if status == STATUS_NEW:
                         if os.path.exists(full_inserted_path):
-                            print('Файл существует:', full_inserted_path)
+                            print(status, 'Файл существует:', full_inserted_path)
 
-                        diff_zip.extract(inserted_file, os.path.dirname(full_inserted_path))
+                        diff_zip.extract(inserted_file, library_path)
                     elif status == STATUS_DELETED:
                         os.unlink(full_existed_path)
                     elif status in (STATUS_MOVED, STATUS_RENAMED, STATUS_MOVED_AND_RENAMED):
+                        if os.path.exists(full_inserted_path):
+                            print(status, 'Файл существует:', full_inserted_path)
+
                         os.rename(full_existed_path, full_inserted_path)
 
                 diff_file.close()
