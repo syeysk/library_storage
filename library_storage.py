@@ -12,6 +12,7 @@ STATUS_RENAMED = 'Переименовали'
 STATUS_MOVED_AND_RENAMED = 'Переместили и переименовали'
 STATUS_UNTOUCHED = 'Не тронут'
 STATUS_DELETED = 'Удалён'
+TEMP_DIRECTORY = os.path.join(os.path.expandvars('%TEMP%'), 'library_storage')
 
 
 def get_file_hash(file_path):
@@ -133,7 +134,7 @@ class LibraryStorage:
         self.diff_file_path = diff_file_path
         self.diff_csv = None
         self.diff_zip = None
-        self.temp_diff_file = os.path.expandvars(os.path.join('%TEMP%', self.ARCHIVE_DIFF_FILE_NAME))
+        self.temp_diff_file = os.path.join(TEMP_DIRECTORY, self.ARCHIVE_DIFF_FILE_NAME)
 
     def __enter__(self):
         return self
