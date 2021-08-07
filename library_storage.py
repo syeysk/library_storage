@@ -16,7 +16,7 @@ STATUS_DELETED = 'Удалён'
 
 def get_file_hash(file_path):
     BLOCKSIZE = 65536
-    hasher = hashlib.md5()
+    hasher = hashlib.blake2s()
     with open(file_path, 'rb') as afile:
         buf = afile.read(BLOCKSIZE)
         while len(buf) > 0:
@@ -37,7 +37,7 @@ class DBStorage:
     SQL_UPDATE_SET_IS_DELETED = 'UPDATE files SET is_deleted=1'
     SQL_CREATE_TABLE = '''
         CREATE TABLE IF NOT EXISTS files (
-            hash VARCHAR(255) UNIQUE,
+            hash VARCHAR(64) UNIQUE,
             id INTEGER PRIMARY KEY,
             directory VARCHAR(255),
             filename VARCHAR(255),
