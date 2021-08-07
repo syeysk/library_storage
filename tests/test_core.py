@@ -1,4 +1,5 @@
 import os
+import shutil
 from unittest import TestCase
 from unittest.mock import patch
 
@@ -67,7 +68,7 @@ class CoreTestCase(TestCase):
     @classmethod
     def tearDownClass(cls) -> None:
         cls.lib_storage.__exit__(None, None, None)
-        os.unlink(TEMP_DIRECTORY)
+        shutil.rmtree(TEMP_DIRECTORY, ignore_errors=True)
 
     def test_scan_to_db(self):
         ...
