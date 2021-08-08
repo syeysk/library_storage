@@ -42,12 +42,10 @@ class CoreTestCase(TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
-        cls.repository_path = os.path.dirname(os.path.dirname(__file__))
         cls.library_path = os.path.join(TEMP_DIRECTORY, 'origin')
-        cls.library_path_changed = os.path.join(cls.repository_path, 'example_library_changed')
-        cls.csv_path = os.path.join(cls.repository_path, 'example_csv')
-        cls.diff_path = os.path.join(cls.repository_path, 'example_diff')
-        cls.diff_file_path = os.path.join(cls.diff_path, 'example_diff.zip')
+        cls.library_path_changed = os.path.join(TEMP_DIRECTORY, 'example_library_changed')
+        cls.csv_path = os.path.join(TEMP_DIRECTORY, 'example_csv')
+        cls.diff_file_path = os.path.join(TEMP_DIRECTORY, 'example_diff.zip')
         cls.db_path = ':memory:'
 
         if not os.path.exists(TEMP_DIRECTORY):
@@ -59,10 +57,7 @@ class CoreTestCase(TestCase):
         create_test_origin_library(cls.library_path)
         cls.lib_storage = LibraryStorage(
             library_path=cls.library_path,
-            csv_path=cls.csv_path,
             db_path=cls.db_path,
-            diff_path=cls.diff_path,
-            diff_file_path=cls.diff_file_path
         )
 
     @classmethod
@@ -71,4 +66,4 @@ class CoreTestCase(TestCase):
         shutil.rmtree(TEMP_DIRECTORY, ignore_errors=True)
 
     def test_scan_to_db(self):
-        ...
+        self.lib_storage.scan_to_db()
