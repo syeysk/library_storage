@@ -192,23 +192,24 @@ class LibraryStorage:
         csv_writer = None
         csv_file = None
         csv_current_page = 0
-        total_count_files = None
-        for total_count_files, row in enumerate(self.db.select_rows()):
-            if total_count_files % self.CSV_COUNT_ROWS_ON_PAGE == 0:
+        number_of_last_row_on_current_page = self.CSV_COUNT_ROWS_ON_PAGE
+        for number_of_current_row, row in enumerate(self.db.select_rows()):
+            number_of_last_row_on_current_page = number_of_last_row_on_current_page - row[1] + 1
+            if csv_writer is None or number_of_current_row == number_of_last_row_on_current_page:
                 if csv_file:
                     csv_file.close()
 
+                number_of_last_row_on_current_page += self.CSV_COUNT_ROWS_ON_PAGE
                 csv_current_page += 1
                 csv_full_path = os.path.join(csv_path, '{}.csv'.format(str(csv_current_page)))
                 csv_file = open(csv_full_path, 'w', encoding='utf-8', newline='\n')
                 csv_writer = csv.writer(csv_file)
 
             csv_writer.writerow(row)
+            number_of_last_row_on_current_page += row[1]
 
         if csv_file:
             csv_file.close()
-
-        print('Экспортировано файлов:', total_count_files, 'шт')
 
     def import_csv_to_db(self, csv_path) -> None:
         for csv_filename in os.scandir(csv_path):
