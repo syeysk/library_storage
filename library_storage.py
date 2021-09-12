@@ -70,7 +70,22 @@ class DBStorage:
     def is_ready_for_insert(self) -> bool:
         return len(self.seq_sql_params) == self.COUNT_ROWS_FOR_INSERT
 
-    def insert_rows(self, with_id: bool = True, do_insert_new: bool = True, func=None) -> tuple:
+    def insert_rows(
+            self,
+            with_id: bool = True,
+            do_insert_new: bool = True,
+            func=None,
+            delete_dublicate: bool = False
+    ) -> tuple:
+        """
+        Добавляет список файлов в базу
+        :param with_id:
+        :param do_insert_new:
+        :param func:
+        :param delete_dublicate: если Истина, то будет удалять с диска файлы с одинаковым хешем,
+        иначе - возбуждать исключение
+        :return:
+        """
         sql = self.SQL_INSERT_ROW_WITH_ID if with_id else self.SQL_INSERT_ROW
         for sql_params in self.seq_sql_params:
             file_hash = sql_params[0]
@@ -80,7 +95,13 @@ class DBStorage:
             existed_directory, existed_filename = None, None
             if not is_exists:
                 if do_insert_new:
-                    self.cu.execute(sql, sql_params)
+                    try:
+                        self.cu.execute(sql, sql_params)
+                    except sqlite3.IntegrityError as error:
+                        if not delete_dublicate:
+                            raise Exception('Обнаружен дубликат файла с отличающимся именем: {}'.format(error))
+
+                        print(error)  # TODO удалять файлы с разным именем, но с одинаковым хешем.
             else:
                 existed_directory, existed_filename = is_exists[1:]
                 self.cu.execute('UPDATE files SET is_deleted=0 WHERE hash=?', (file_hash,))
@@ -88,10 +109,6 @@ class DBStorage:
             if func:
                 func(inserted_directory, inserted_filename, is_exists, existed_directory, existed_filename)
 
-        # try:
-        #     self.cu.executemany(sql, self.seq_sql_params)
-        # except sqlite3.IntegrityError as error:
-        #     print(error)
         self.c.commit()
         self.seq_sql_params.clear()
 
@@ -141,7 +158,7 @@ class LibraryStorage:
     def __exit__(self, _1, _2, _3):
         self.db.c.close()
 
-    def scan_to_db(self, library_path=None, diff_file_path=None) -> None:
+    def scan_to_db(self, library_path=None, diff_file_path=None, delete_dublicate=False) -> None:
         """Сканирует информацию о файлах в директории и заносит её в базу"""
         def print_file_status(inserted_directory, inserted_filename, is_exists, existed_directory, existed_filename):
             status, existed_path, inserted_path = self.print_file_status(
@@ -174,9 +191,9 @@ class LibraryStorage:
                     self.db.append_row((file_hash, directory, filename))
                     total_count_files += 1
                     if self.db.is_ready_for_insert():
-                        self.db.insert_rows(with_id=False, func=print_file_status)
+                        self.db.insert_rows(with_id=False, func=print_file_status, delete_dublicate=delete_dublicate)
 
-            self.db.insert_rows(with_id=False, func=print_file_status)
+            self.db.insert_rows(with_id=False, func=print_file_status, delete_dublicate=delete_dublicate)
             self.db.print_deleted_files(func=self.diff_csv.writerow)
             print('Обнаружено файлов:', total_count_files, 'шт')
 
