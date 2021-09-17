@@ -10,6 +10,8 @@
 """
 import argparse
 
+from library_storage import LibraryStorage
+
 parser = argparse.ArgumentParser(description='Система поддержания целостности копий директорий')
 
 subparser = parser.add_subparsers(dest='command')
@@ -28,9 +30,15 @@ parser_applydiff.add_argument('--path', dest='path', action='store', required=Tr
 parser_applydiff.add_argument('--diff', dest='diff', action='store', required=True)
 
 args = parser.parse_args()
+db_path = ':memory:'
 if args.command == 'scan':
-    ...
+    with LibraryStorage(library_path=args.path, db_path=db_path) as lib_storage:
+        lib_storage.scan_to_db()
+        lib_storage.export_db_to_csv(args.struct)
+
 elif args.command == 'makediff':
-    ...
+    with LibraryStorage(library_path=args.path, db_path=db_path) as lib_storage:
+        lib_storage.apply_diff(args.diff)
+
 elif args.command == 'applydiff':
     ...
