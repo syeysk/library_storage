@@ -12,18 +12,25 @@ import argparse
 
 parser = argparse.ArgumentParser(description='Система поддержания целостности копий директорий')
 
-subparser = parser.add_subparsers('scan')
-subparser.add_argument('path', dest='path', action='store', require=True)
-subparser.add_argument('struct', dest='struct', action='store', require=True)
+subparser = parser.add_subparsers(dest='command')
 
-subparser = parser.add_subparsers('makediff')
-subparser.add_argument('path', dest='path', action='store', require=True)
-subparser.add_argument('struct', dest='struct', action='store', require=True)
-subparser.add_argument('diff', dest='diff', action='store', require=True)
+parser_scan = subparser.add_parser('scan')
+parser_scan.add_argument('--path', dest='path', action='store', required=True)
+parser_scan.add_argument('--struct', dest='struct', action='store', required=True)
 
-subparser = parser.add_subparsers('applydiff')
-subparser.add_argument('path', dest='path', action='store', require=True)
-subparser.add_argument('diff', dest='diff', action='store', require=True)
+parser_makediff = subparser.add_parser('makediff')
+parser_makediff.add_argument('--path', dest='path', action='store', required=True)
+parser_makediff.add_argument('--struct', dest='struct', action='store', required=True)
+parser_makediff.add_argument('--diff', dest='diff', action='store', required=True)
 
+parser_applydiff = subparser.add_parser('applydiff')
+parser_applydiff.add_argument('--path', dest='path', action='store', required=True)
+parser_applydiff.add_argument('--diff', dest='diff', action='store', required=True)
 
-
+args = parser.parse_args()
+if args.command == 'scan':
+    ...
+elif args.command == 'makediff':
+    ...
+elif args.command == 'applydiff':
+    ...
