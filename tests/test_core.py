@@ -47,6 +47,7 @@ class CoreTestCase(TestCase):
         cls.csv_path = os.path.join(TEMP_DIRECTORY, 'example_csv')
         cls.diff_file_path = os.path.join(TEMP_DIRECTORY, 'example_diff.zip')
         cls.db_path = ':memory:'
+        os.chdir(cls.library_path)
 
         if not os.path.exists(TEMP_DIRECTORY):
             os.mkdir(TEMP_DIRECTORY)
@@ -55,10 +56,7 @@ class CoreTestCase(TestCase):
             os.mkdir(cls.library_path)
 
         create_test_origin_library(cls.library_path)
-        cls.lib_storage = LibraryStorage(
-            library_path=cls.library_path,
-            db_path=cls.db_path,
-        )
+        cls.lib_storage = LibraryStorage(db_path=cls.db_path)
 
     @classmethod
     def tearDownClass(cls) -> None:
@@ -66,4 +64,4 @@ class CoreTestCase(TestCase):
         shutil.rmtree(TEMP_DIRECTORY, ignore_errors=True)
 
     def test_scan_to_db(self):
-        self.lib_storage.scan_to_db()
+        self.lib_storage.scan_to_db(library_path=self.library_path)

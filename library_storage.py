@@ -136,18 +136,14 @@ class LibraryStorage:
     CSV_COUNT_ROWS_ON_PAGE = 20
     ARCHIVE_DIFF_FILE_NAME = 'diff.csv'
 
-    def __init__(self, library_path: str, db_path: str) -> None:
+    def __init__(self, db_path: str) -> None:
         """
         Инициализирует класс хранилища
-        :param library_path:
         :param db_path:
         :param name:
         """
-        self.library_path = library_path
-        os.chdir(library_path)
         self.db = DBStorage(db_path=db_path)
         self.diff_csv = None
-        self.diff_zip = None
         self.temp_diff_file = os.path.join(TEMP_DIRECTORY, self.ARCHIVE_DIFF_FILE_NAME)
         if not os.path.exists(TEMP_DIRECTORY):
             os.mkdir(TEMP_DIRECTORY)
@@ -158,7 +154,7 @@ class LibraryStorage:
     def __exit__(self, _1, _2, _3):
         self.db.c.close()
 
-    def scan_to_db(self, library_path=None, diff_file_path=None, delete_dublicate=False) -> None:
+    def scan_to_db(self, library_path, diff_file_path=None, delete_dublicate=False) -> None:
         """Сканирует информацию о файлах в директории и заносит её в базу"""
         def print_file_status(inserted_directory, inserted_filename, is_exists, existed_directory, existed_filename):
             status, existed_path, inserted_path = self.print_file_status(
@@ -174,7 +170,6 @@ class LibraryStorage:
                 diff_zip.write(os.path.join(library_path, inserted_path), inserted_path)
 
         self.db.set_is_deleted()
-        library_path = self.library_path if library_path is None else library_path
         diff_zip = zipfile.ZipFile(diff_file_path, 'w') if diff_file_path else None
         with open(self.temp_diff_file, 'w', encoding='utf-8', newline='\n') as diff_file:
             self.diff_csv = csv.writer(diff_file)
@@ -238,8 +233,7 @@ class LibraryStorage:
 
         self.db.insert_rows()
 
-    def apply_diff(self, diff_file_zip_path, library_path=None):
-        library_path = self.library_path if library_path is None else library_path
+    def apply_diff(self, library_path, diff_file_zip_path):
         with zipfile.ZipFile(diff_file_zip_path, 'r') as diff_zip:
             diff_zip.testzip()
             with diff_zip.open(self.ARCHIVE_DIFF_FILE_NAME, 'r') as diff_file:
@@ -297,6 +291,7 @@ if __name__ == '__main__':
     csv_path = os.path.join(repository_path, 'example_csv')
     diff_file_path = os.path.join(repository_path, 'example_diff.zip')
     db_path = ':memory:'
+    os.chdir(library_path)
 
     if not os.path.exists(csv_path):
         os.makedirs(csv_path)
@@ -304,11 +299,8 @@ if __name__ == '__main__':
         if not os.path.isdir(csv_path):
             raise Exception('Не является директорией: csv_path =', csv_path)
 
-    with LibraryStorage(
-            library_path=library_path,
-            db_path=db_path
-    ) as lib_storage:
-        lib_storage.scan_to_db()
+    with LibraryStorage(db_path=db_path) as lib_storage:
+        lib_storage.scan_to_db(library_path=library_path)
         lib_storage.export_db_to_csv(csv_path)
         print('Кол-во строк до очистки:', lib_storage.db.get_count_rows())
         lib_storage.db.clear()
@@ -337,4 +329,4 @@ if __name__ == '__main__':
                 if not os.path.exists(file_path_copy):
                     os.makedirs(file_path_copy)
 
-        lib_storage.apply_diff(diff_file_zip_path=diff_file_path, library_path=library_path_copy)
+        lib_storage.apply_diff(library_path=library_path_copy, diff_file_zip_path=diff_file_path)

@@ -9,6 +9,7 @@
 - `--config` - путь к конфигу. Если указан, то значения недостающих опций будут браться из данного конфига.
 """
 import argparse
+import os
 
 from library_storage import LibraryStorage
 
@@ -32,13 +33,22 @@ parser_applydiff.add_argument('--diff', dest='diff', action='store', required=Tr
 args = parser.parse_args()
 db_path = ':memory:'
 if args.command == 'scan':
-    with LibraryStorage(library_path=args.path, db_path=db_path) as lib_storage:
-        lib_storage.scan_to_db()
-        lib_storage.export_db_to_csv(args.struct)
+    library_dir = os.path.abspath(args.path)
+    struct_dir = os.path.abspath(args.struct)
+    with LibraryStorage(db_path=db_path) as lib_storage:
+        lib_storage.scan_to_db(library_path=library_dir)
+        lib_storage.export_db_to_csv(struct_dir)
 
 elif args.command == 'makediff':
-    with LibraryStorage(library_path=args.path, db_path=db_path) as lib_storage:
-        lib_storage.apply_diff(args.diff)
+    library_dir = os.path.abspath(args.path)
+    struct_dir = os.path.abspath(args.struct)
+    diff_filepath = os.path.abspath(args.diff)
+    with LibraryStorage(db_path=db_path) as lib_storage:
+        lib_storage.import_csv_to_db(struct_dir)
+        lib_storage.scan_to_db(library_path=library_dir, diff_file_path=diff_filepath)
 
 elif args.command == 'applydiff':
-    ...
+    library_dir = os.path.abspath(args.path)
+    diff_filepath = os.path.abspath(args.diff)
+    with LibraryStorage(library_path=library_dir, db_path=db_path) as lib_storage:
+        lib_storage.apply_diff(diff_filepath)
