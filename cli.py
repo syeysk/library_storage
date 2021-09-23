@@ -18,37 +18,47 @@ parser = argparse.ArgumentParser(description='Система поддержан�
 subparser = parser.add_subparsers(dest='command')
 
 parser_scan = subparser.add_parser('scan')
-parser_scan.add_argument('--path', dest='path', action='store', required=True)
+parser_scan.add_argument('--path', dest='path', action='store', required=True, help='original storage')
+
+parser_scan = subparser.add_parser('import')
+parser_scan.add_argument('--struct', dest='struct', action='store', required=True)
+
+parser_scan = subparser.add_parser('export')
 parser_scan.add_argument('--struct', dest='struct', action='store', required=True)
 
 parser_makediff = subparser.add_parser('makediff')
-parser_makediff.add_argument('--path', dest='path', action='store', required=True)
-parser_makediff.add_argument('--struct', dest='struct', action='store', required=True)
+parser_makediff.add_argument('--path', dest='path', action='store', required=True, help='changed storage')
 parser_makediff.add_argument('--diff', dest='diff', action='store', required=True)
 
 parser_applydiff = subparser.add_parser('applydiff')
-parser_applydiff.add_argument('--path', dest='path', action='store', required=True)
+parser_applydiff.add_argument('--path', dest='path', action='store', required=True, help='original storage')
 parser_applydiff.add_argument('--diff', dest='diff', action='store', required=True)
 
 args = parser.parse_args()
 db_path = ':memory:'
 if args.command == 'scan':
     library_dir = os.path.abspath(args.path)
-    struct_dir = os.path.abspath(args.struct)
     with LibraryStorage(db_path=db_path) as lib_storage:
         lib_storage.scan_to_db(library_path=library_dir)
+
+elif args.command == 'import':
+    struct_dir = os.path.abspath(args.struct)
+    with LibraryStorage(db_path=db_path) as lib_storage:
+        lib_storage.import_csv_to_db(struct_dir)
+
+elif args.command == 'import':
+    struct_dir = os.path.abspath(args.struct)
+    with LibraryStorage(db_path=db_path) as lib_storage:
         lib_storage.export_db_to_csv(struct_dir)
 
 elif args.command == 'makediff':
     library_dir = os.path.abspath(args.path)
-    struct_dir = os.path.abspath(args.struct)
     diff_filepath = os.path.abspath(args.diff)
     with LibraryStorage(db_path=db_path) as lib_storage:
-        lib_storage.import_csv_to_db(struct_dir)
         lib_storage.scan_to_db(library_path=library_dir, diff_file_path=diff_filepath)
 
 elif args.command == 'applydiff':
     library_dir = os.path.abspath(args.path)
     diff_filepath = os.path.abspath(args.diff)
-    with LibraryStorage(library_path=library_dir, db_path=db_path) as lib_storage:
+    with LibraryStorage(db_path=db_path) as lib_storage:
         lib_storage.apply_diff(diff_filepath)
