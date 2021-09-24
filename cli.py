@@ -13,7 +13,17 @@ import os
 
 from library_storage import LibraryStorage
 
+DEFAULT_DB_PATH = os.path.expandvars(os.path.join('%TEMP%', 'cli_library_storage.db'))
+
 parser = argparse.ArgumentParser(description='Система поддержания целостности копий директорий')
+parser.add_argument(
+    '--db',
+    dest='db',
+    action='store',
+    required=False,
+    help='original storage',
+    default=DEFAULT_DB_PATH
+)
 
 subparser = parser.add_subparsers(dest='command')
 
@@ -32,10 +42,10 @@ parser_makediff.add_argument('--diff', dest='diff', action='store', required=Tru
 
 parser_applydiff = subparser.add_parser('applydiff')
 parser_applydiff.add_argument('--path', dest='path', action='store', required=True, help='original storage')
-parser_applydiff.add_argument('--diff', dest='diff', action='store', required=True)
+parser_applydiff.add_argument('--diff', dest='diff', action='store', required=True, help='diff from changed storage')
 
 args = parser.parse_args()
-db_path = ':memory:'
+db_path = os.path.abspath(args.db) if args.db != ':temp:' else args.path
 if args.command == 'scan':
     library_dir = os.path.abspath(args.path)
     with LibraryStorage(db_path=db_path) as lib_storage:
