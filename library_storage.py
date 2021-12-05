@@ -154,7 +154,13 @@ class LibraryStorage:
     def __exit__(self, _1, _2, _3):
         self.db.c.close()
 
-    def scan_to_db(self, library_path, diff_file_path=None, delete_dublicate=False) -> None:
+    def scan_to_db(
+            self,
+            library_path,
+            diff_file_path=None,
+            delete_dublicate=False,
+            progress_count_scanned_files=None
+    ) -> None:
         """Сканирует информацию о файлах в директории и заносит её в базу"""
         def print_file_status(inserted_directory, inserted_filename, is_exists, existed_directory, existed_filename):
             status, existed_path, inserted_path = self.print_file_status(
@@ -185,6 +191,8 @@ class LibraryStorage:
                     file_hash = get_file_hash(os.path.join(directory, filename))
                     self.db.append_row((file_hash, directory, filename))
                     total_count_files += 1
+                    if progress_count_scanned_files:
+                        progress_count_scanned_files(total_count_files)
                     if self.db.is_ready_for_insert():
                         self.db.insert_rows(with_id=False, func=print_file_status, delete_dublicate=delete_dublicate)
 
@@ -196,7 +204,7 @@ class LibraryStorage:
             diff_zip.write(self.temp_diff_file, self.ARCHIVE_DIFF_FILE_NAME)
             diff_zip.close()
 
-    def export_db_to_csv(self, csv_path) -> None:
+    def export_db_to_csv(self, csv_path, progress_count_exported_files=None) -> None:
         """
         Экспортирует из базы метаинформацию в CSV без заголовков. Формат строки следующий:
         хэш,идентификатор,директория,имя файла
@@ -205,6 +213,7 @@ class LibraryStorage:
         csv_file = None
         csv_current_page = 0
         number_of_last_row_on_current_page = self.CSV_COUNT_ROWS_ON_PAGE
+        count_rows = self.db.get_count_rows() if progress_count_exported_files else None
         for number_of_current_row, row in enumerate(self.db.select_rows()):
             number_of_last_row_on_current_page = number_of_last_row_on_current_page - row[1] + 1
             if csv_writer is None or number_of_current_row == number_of_last_row_on_current_page:
@@ -216,6 +225,8 @@ class LibraryStorage:
                 csv_full_path = os.path.join(csv_path, '{}.csv'.format(str(csv_current_page)))
                 csv_file = open(csv_full_path, 'w', encoding='utf-8', newline='\n')
                 csv_writer = csv.writer(csv_file)
+                if progress_count_exported_files:
+                    progress_count_exported_files(number_of_current_row, count_rows, csv_current_page + 1)
 
             csv_writer.writerow(row)
             number_of_last_row_on_current_page += row[1]
