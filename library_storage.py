@@ -154,6 +154,9 @@ class LibraryStorage:
     def __exit__(self, _1, _2, _3):
         self.db.c.close()
 
+    def select_db(self, db_path: str):
+        self.db = DBStorage(db_path=db_path)
+
     def scan_to_db(
             self,
             library_path,
