@@ -133,7 +133,7 @@ class DBStorage:
 
 
 class LibraryStorage:
-    CSV_COUNT_ROWS_ON_PAGE = 20
+    CSV_COUNT_ROWS_ON_PAGE = 100
     ARCHIVE_DIFF_FILE_NAME = 'diff.csv'
 
     def __init__(self, db_path: str) -> None:
@@ -217,6 +217,7 @@ class LibraryStorage:
         csv_current_page = 0
         number_of_last_row_on_current_page = self.CSV_COUNT_ROWS_ON_PAGE
         count_rows = self.db.get_count_rows() if progress_count_exported_files else None
+        number_of_current_row = None
         for number_of_current_row, row in enumerate(self.db.select_rows()):
             number_of_last_row_on_current_page = number_of_last_row_on_current_page - row[1] + 1
             if csv_writer is None or number_of_current_row == number_of_last_row_on_current_page:
@@ -229,10 +230,13 @@ class LibraryStorage:
                 csv_file = open(csv_full_path, 'w', encoding='utf-8', newline='\n')
                 csv_writer = csv.writer(csv_file)
                 if progress_count_exported_files:
-                    progress_count_exported_files(number_of_current_row, count_rows, csv_current_page + 1)
+                    progress_count_exported_files(number_of_current_row + 1, count_rows, csv_current_page)
 
             csv_writer.writerow(row)
             number_of_last_row_on_current_page += row[1]
+
+        if progress_count_exported_files:
+            progress_count_exported_files(number_of_current_row + 1, count_rows, csv_current_page)
 
         if csv_file:
             csv_file.close()
