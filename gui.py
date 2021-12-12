@@ -1,5 +1,6 @@
+import tkinter as tk
 from os import curdir, path
-from tkinter import Button, filedialog, Label, Tk
+from tkinter import Button, filedialog, Frame, Label, Tk
 
 from library_storage import LibraryStorage
 
@@ -49,28 +50,35 @@ with LibraryStorage(db_path=storage_db) as lib_storage:
     window = Tk()
     window.title("SYeysk LibraryStorage")
 
-    lbl_storage_directory = Label(window, text="Оригинальное хранилище:")
-    lbl_storage_directory.grid(column=0, row=0)
-    val_storage_directory = Label(window, text="")
-    val_storage_directory.grid(column=1, row=0)
-    btn_select_storage_directory = Button(window, text="Выбрать", command=select_storage_directory)
-    btn_select_storage_directory.grid(column=0, row=1)
-    btn_command_scan = Button(window, text="Сканировать", command=command_scan)
-    btn_command_scan.grid(column=1, row=1)
-    btn_command_export = Button(window, text="Экспорт", command=command_export)
-    btn_command_export.grid(column=2, row=1)
+    frame_input = Frame(window)
+    btn_select_storage_directory = Button(frame_input, text="Выбрать хранилище", command=select_storage_directory)
+    btn_select_storage_directory.pack(side=tk.LEFT)
+    lbl_storage_directory = Label(frame_input, text="Оригинальное хранилище:")
+    lbl_storage_directory.pack(side=tk.LEFT)
+    val_storage_directory = Label(frame_input, text="")
+    val_storage_directory.pack(side=tk.LEFT)
+    frame_input.pack()
 
-    lbl_structure = Label(window, text="Структура хранилища:")
-    lbl_structure.grid(column=0, row=2)
-    val_structure = Label(window, text="")
-    val_structure.grid(column=1, row=2)
-    lbl_stat_db_path = Label(window, text="База хранилища:")
-    lbl_stat_db_path.grid(column=0, row=3)
-    val_stat_db_path = Label(window, text="")
-    val_stat_db_path.grid(column=1, row=3)
-    lbl_stat_count_files = Label(window, text="Файлов отсканировано:")
-    lbl_stat_count_files.grid(column=0, row=4)
-    val_stat_count_files = Label(window, text="")
-    val_stat_count_files.grid(column=1, row=4)
+    frame_buttons = Frame(window)
+    btn_command_scan = Button(frame_buttons, text="Сканировать", command=command_scan)
+    btn_command_scan.pack(side=tk.RIGHT)
+    btn_command_export = Button(frame_buttons, text="Экспорт", command=command_export)
+    btn_command_export.pack(side=tk.RIGHT)
+    frame_buttons.pack()
+
+    frame_statistic = Frame(window)
+    lbl_structure = Label(frame_statistic, text="Структура хранилища:")
+    lbl_structure.pack(side=tk.TOP)
+    val_structure = Label(frame_statistic, text="")
+    val_structure.pack(side=tk.TOP)
+    lbl_stat_db_path = Label(frame_statistic, text="База хранилища:")
+    lbl_stat_db_path.pack(side=tk.TOP)
+    val_stat_db_path = Label(frame_statistic, text="")
+    val_stat_db_path.pack(side=tk.TOP)
+    lbl_stat_count_files = Label(frame_statistic, text="Файлов отсканировано:")
+    lbl_stat_count_files.pack(side=tk.TOP)
+    val_stat_count_files = Label(frame_statistic, text="")
+    val_stat_count_files.pack(side=tk.TOP)
+    frame_statistic.pack()
 
     window.mainloop()
