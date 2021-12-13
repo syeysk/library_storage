@@ -12,7 +12,7 @@ class GUI(Tk):
         self.storage_db = ''
         self.storage_directory = None
         self.storage_structure = None
-        self.type_scan = StringVar()
+        self.type_scan = StringVar(value='files')
 
     def progress_count_exported_files(self, number_of_current_row, count_rows, csv_current_page):
         text = '{}/{} Страниц: {}'.format(number_of_current_row, count_rows, csv_current_page)
@@ -24,7 +24,7 @@ class GUI(Tk):
     def check_command_scan_files(self, thread):
         if thread.is_alive():
             self.after(1000, self.check_command_scan_files, thread)
-            print('поток выполняется')
+            # print('поток выполняется')
         else:
             print('поток завершён')
             self.lib_storage.select_db(self.storage_db)
@@ -41,7 +41,7 @@ class GUI(Tk):
     def check_command_scan_structure(self, thread):
         if thread.is_alive():
             self.after(1000, self.check_command_scan_structure, thread)
-            print('поток выполняется')
+            # print('поток выполняется')
         else:
             print('поток завершён')
             self.lib_storage.select_db(self.storage_db)
@@ -96,6 +96,9 @@ class GUI(Tk):
         type_scan = self.type_scan.get()
         if type_scan == 'files':
             self.storage_directory = filedialog.askdirectory(initialdir=curdir)
+            if not self.storage_directory:
+                return
+
             self.storage_structure = '{}_structure'.format(self.storage_directory)  # '{}.zip'.format(storage_directory)
             self.storage_db = '{}.db'.format(self.storage_directory)
             if not path.exists(self.storage_structure):
@@ -105,6 +108,9 @@ class GUI(Tk):
         elif type_scan == 'structure':
             self.storage_directory = None
             self.storage_structure = filedialog.askdirectory(initialdir=curdir)
+            if not self.storage_structure:
+                return
+
             self.storage_db = '{}.db'.format(self.storage_structure[:-len('_structure')])
 
             self.val_storage_directory.configure(text='Не существует')

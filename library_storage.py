@@ -93,18 +93,23 @@ class DBStorage:
             is_exists = self.cu.execute(sql_select, (file_hash,)).fetchone()
             inserted_directory, inserted_filename = sql_params[2 if with_id else 1:]
             existed_directory, existed_filename = None, None
-            if not is_exists:
+            if is_exists:
+                existed_directory, existed_filename = is_exists[1:]
+                self.cu.execute('UPDATE files SET is_deleted=0 WHERE hash=?', (file_hash,))
+
+                print('Обнаружен дубликат по хешу: {}\n    В базе:{}'.format(
+                    os.path.join(inserted_directory, inserted_filename),
+                    os.path.join(existed_directory, existed_filename),
+                ))
+            else:
                 if do_insert_new:
                     try:
                         self.cu.execute(sql, sql_params)
                     except sqlite3.IntegrityError as error:
                         if not delete_dublicate:
-                            raise Exception('Обнаружен дубликат файла с отличающимся именем: {}'.format(error))
+                            raise Exception('Обнаружен дубликат файла с отличающимся именем среди порции вставляемых файлов: {}'.format(error))
 
                         print(error)  # TODO удалять файлы с разным именем, но с одинаковым хешем.
-            else:
-                existed_directory, existed_filename = is_exists[1:]
-                self.cu.execute('UPDATE files SET is_deleted=0 WHERE hash=?', (file_hash,))
 
             if func:
                 func(inserted_directory, inserted_filename, is_exists, existed_directory, existed_filename)
