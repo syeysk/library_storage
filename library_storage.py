@@ -182,7 +182,7 @@ class LibraryStorage:
                 self.diff_csv.writerow((status, existed_path, inserted_path))
 
             if diff_file_path and status == STATUS_NEW:
-                diff_zip.write(os.path.join(library_path, inserted_path), inserted_path)
+                diff_zip.write(os.path.join(library_path, 'storage', inserted_path), inserted_path)
 
         self.db.set_is_deleted()
         diff_zip = zipfile.ZipFile(diff_file_path, 'w') if diff_file_path else None
@@ -276,7 +276,7 @@ class LibraryStorage:
                         if os.path.exists(full_inserted_path):
                             print(status, 'Файл существует:', full_inserted_path)
 
-                        diff_zip.extract(inserted_file, library_path)
+                        diff_zip.extract(os.path.join('storage', inserted_file), library_path)
                     elif status == STATUS_DELETED:
                         os.unlink(full_existed_path)
                     elif status in (STATUS_MOVED, STATUS_RENAMED, STATUS_MOVED_AND_RENAMED):
