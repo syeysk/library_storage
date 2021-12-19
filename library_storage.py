@@ -180,6 +180,7 @@ class LibraryStorage:
             )
             if status != STATUS_UNTOUCHED:
                 self.diff_csv.writerow((status, existed_path, inserted_path))
+
             if diff_file_path and status == STATUS_NEW:
                 diff_zip.write(os.path.join(library_path, inserted_path), inserted_path)
 

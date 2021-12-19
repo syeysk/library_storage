@@ -1,6 +1,7 @@
 from os import curdir, path, makedirs
 from threading import Thread
-from tkinter import GROOVE, LEFT, RIGHT, TOP, Button, Frame, Label, StringVar, Tk, Radiobutton, filedialog
+from tkinter import GROOVE, LEFT, RIGHT, TOP, Frame, StringVar, Tk, filedialog
+from tkinter.ttk import Button, Label, Radiobutton, Separator
 
 from library_storage import LibraryStorage
 
@@ -13,6 +14,9 @@ class GUI(Tk):
         self.storage_directory = None
         self.storage_structure = None
         self.type_scan = StringVar(value='files')
+
+        self.storage_directory_copy = None
+        self.diff_file_path = None
 
     def progress_count_exported_files(self, number_of_current_row, count_rows, csv_current_page):
         text = '{}/{} Страниц: {}'.format(number_of_current_row, count_rows, csv_current_page)
@@ -122,15 +126,51 @@ class GUI(Tk):
         total_scanned_files = self.lib_storage.db.get_count_rows()
         self.progress_count_scanned_files(total_scanned_files)
 
+    def select_storage_directory_copy(self):
+        self.storage_directory_copy = filedialog.askdirectory(initialdir=curdir)
+        if not self.storage_directory_copy:
+            return
+
+        self.val_storage_directory_copy.configure(text=self.storage_directory_copy)
+        self.diff_file_path = '{}_diff.zip'.format(self.storage_directory_copy)
+
+    def check_command_generate_diff(self, thread):
+        if thread.is_alive():
+            self.after(1000, self.check_command_generate_diff, thread)
+            # print('поток выполняется')
+        else:
+            print('поток завершён')
+            self.lib_storage.select_db(self.storage_db)
+
+    def fg_command_generate_diff(self):
+        self.lib_storage.select_db(self.storage_db)
+        self.lib_storage.scan_to_db(
+            self.storage_directory_copy,
+            diff_file_path=self.diff_file_path,
+            delete_dublicate=False,
+            progress_count_scanned_files=None  # self.progress_count_scanned_files
+        )
+
+    def command_generate_diff(self):
+        if not self.storage_directory_copy:
+            print('Пожалуйста, выберите директорию копии хранилища')
+            return
+
+        thread = Thread(None, self.fg_command_generate_diff)
+        thread.start()
+        self.check_command_generate_diff(thread)
+
     def create_window(self):
         self.title("SYeysk LibraryStorage")
 
-        frame_input = Frame(self, relief=GROOVE, borderwidth=2)
+        # Оригинальное хранилище
+
+        frame_input = Frame(self, relief=GROOVE, borderwidth=2, padx=10, pady=5)
 
         frame_input_radios = Frame(frame_input)
         rb_type_scan_files = Radiobutton(frame_input_radios, variable=self.type_scan, text='файлы', value='files')
         rb_type_scan_files.pack(side=TOP)
-        rb_type_scan_structure = Radiobutton(frame_input_radios, variable=self.type_scan, text='структура', value='structure', justify=RIGHT)
+        rb_type_scan_structure = Radiobutton(frame_input_radios, variable=self.type_scan, text='структура', value='structure')
         rb_type_scan_structure.pack(side=TOP)
         frame_input_radios.pack(side=LEFT)
 
@@ -141,7 +181,7 @@ class GUI(Tk):
         lbl_storage_directory.pack(side=LEFT)
         self.val_storage_directory = Label(frame_input_labels, text="")
         self.val_storage_directory.pack(side=LEFT)
-        frame_input_labels.pack(side=TOP)
+        frame_input_labels.pack()
 
         frame_input_buttons = Frame(frame_input_actions)
         btn_select_storage_directory = Button(
@@ -152,19 +192,20 @@ class GUI(Tk):
         btn_select_storage_directory.pack(side=LEFT)
         btn_command_scan = Button(frame_input_buttons, text="Сканировать", command=self.command_scan)
         btn_command_scan.pack(side=LEFT)
-        frame_input_buttons.pack(side=TOP)
+        frame_input_buttons.pack()
+        btn_command_export = Button(frame_input_buttons, text="Экспорт", command=self.command_export)
+        btn_command_export.pack()
 
         frame_input_actions.pack(side=LEFT)
+        frame_input.pack()
 
-        frame_input.pack(side=TOP)
+        separator = Separator(self, orient='horizontal')
+        separator.pack()
 
-        frame_buttons = Frame(self)
-        btn_command_export = Button(frame_buttons, text="Экспорт", command=self.command_export)
-        btn_command_export.pack(side=RIGHT)
-        frame_buttons.pack()
+        # Статистика
 
-        frame_statistic = Frame(self)
-        lbl_structure = Label(frame_statistic, text="Структура хранилища:")
+        frame_statistic = Frame(self, relief=GROOVE, borderwidth=2, padx=10, pady=5)
+        lbl_structure = Label(frame_statistic, text="Структура хранилища:", justify=LEFT)
         lbl_structure.pack(side=TOP)
         self.val_structure = Label(frame_statistic, text="")
         self.val_structure.pack(side=TOP)
@@ -182,6 +223,40 @@ class GUI(Tk):
         self.val_stat_count_exported_files.pack(side=TOP)
 
         frame_statistic.pack()
+
+        # Копия хранилища
+
+        frame_input_copy = Frame(self, relief=GROOVE, borderwidth=2, padx=10, pady=5)
+
+        # не записывать удалённые: если это копия и мы хотим удалить из оригинпала отсутствующие в копии файлы
+        frame_input_labels_copy = Frame(frame_input_copy)
+        lbl_storage_directory_copy = Label(frame_input_labels_copy, text="Хранилище (копия):")
+        lbl_storage_directory_copy.pack(side=LEFT)
+        self.val_storage_directory_copy = Label(frame_input_labels_copy, text="")
+        self.val_storage_directory_copy.pack(side=LEFT)
+        frame_input_labels_copy.pack()
+
+        btn_select_storage_directory_copy = Button(
+            frame_input_copy,
+            text="Открыть хранилище",
+            command=self.select_storage_directory_copy
+        )
+        btn_select_storage_directory_copy.pack()
+
+        frame_input_copy_buttons = Frame(frame_input_copy)
+        btn_select_storage_directory = Button(
+            frame_input_copy_buttons,
+            text="Сгенерировать diff-файл",
+            command=self.command_generate_diff
+        )
+        btn_select_storage_directory.pack(side=LEFT)
+        # btn_command_scan = Button(frame_input_copy_buttons, text="Применить diff-файл", command=None)
+        # btn_command_scan.pack(side=LEFT)
+        frame_input_copy_buttons.pack(side=TOP)
+
+
+        frame_input_copy.pack()
+
 
 
 with LibraryStorage(db_path='') as lib_storage:
