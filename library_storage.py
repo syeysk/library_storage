@@ -149,7 +149,6 @@ class LibraryStorage:
         """
         self.db = DBStorage(db_path=db_path)
         self.diff_csv = None
-        self.temp_diff_file = os.path.join(TEMP_DIRECTORY, self.ARCHIVE_DIFF_FILE_NAME)
         if not os.path.exists(TEMP_DIRECTORY):
             os.mkdir(TEMP_DIRECTORY)
 
@@ -178,39 +177,45 @@ class LibraryStorage:
                 existed_directory,
                 existed_filename
             )
-            if status != STATUS_UNTOUCHED:
-                self.diff_csv.writerow((status, existed_path, inserted_path))
 
-            if diff_file_path and status == STATUS_NEW:
-                diff_zip.write(os.path.join(library_path, 'storage', inserted_path), inserted_path)
+            if diff_file_path and status != STATUS_UNTOUCHED:
+                diffs.append((status, existed_path, inserted_path))
 
         self.db.set_is_deleted()
-        diff_zip = zipfile.ZipFile(diff_file_path, 'w') if diff_file_path else None
-        with open(self.temp_diff_file, 'w', encoding='utf-8', newline='\n') as diff_file:
-            self.diff_csv = csv.writer(diff_file)
+        os.chdir(library_path)
+        total_count_files = 0
+        diffs = []
+        for directory, _, filenames in os.walk('./'):
+            directory = directory[2:]
+            if os.path.sep == '\\':
+                directory = directory.replace('\\', '/')
 
-            os.chdir(library_path)
-            total_count_files = 0
-            for directory, _, filenames in os.walk('./'):
-                directory = directory[2:]
-                if os.path.sep == '\\':
-                    directory = directory.replace('\\', '/')
+            for filename in filenames:
+                file_hash = get_file_hash(os.path.join(directory, filename))
+                self.db.append_row((file_hash, directory, filename))
+                total_count_files += 1
+                if progress_count_scanned_files:
+                    progress_count_scanned_files(total_count_files)
 
-                for filename in filenames:
-                    file_hash = get_file_hash(os.path.join(directory, filename))
-                    self.db.append_row((file_hash, directory, filename))
-                    total_count_files += 1
-                    if progress_count_scanned_files:
-                        progress_count_scanned_files(total_count_files)
-                    if self.db.is_ready_for_insert():
-                        self.db.insert_rows(with_id=False, func=print_file_status, delete_dublicate=delete_dublicate)
+                if self.db.is_ready_for_insert():
+                    self.db.insert_rows(with_id=False, func=print_file_status, delete_dublicate=delete_dublicate)
 
-            self.db.insert_rows(with_id=False, func=print_file_status, delete_dublicate=delete_dublicate)
-            self.db.print_deleted_files(func=self.diff_csv.writerow)
-            print('Обнаружено файлов:', total_count_files, 'шт')
-
+        self.db.insert_rows(with_id=False, func=print_file_status, delete_dublicate=delete_dublicate)
+        print('Обнаружено файлов:', total_count_files, 'шт')
         if diff_file_path:
-            diff_zip.write(self.temp_diff_file, self.ARCHIVE_DIFF_FILE_NAME)
+            temp_diff_file = os.path.join(TEMP_DIRECTORY, self.ARCHIVE_DIFF_FILE_NAME)
+            diff_zip = zipfile.ZipFile(diff_file_path, 'w')
+            with open(temp_diff_file, 'w', encoding='utf-8', newline='\n') as diff_file:
+                self.diff_csv = csv.writer(diff_file)
+                for status__existed_path__inserted_path in diffs:
+                    self.diff_csv.writerow(status__existed_path__inserted_path)
+                    if status__existed_path__inserted_path[0] == STATUS_NEW:
+                        inserted_path = status__existed_path__inserted_path[2]
+                        diff_zip.write(os.path.join(library_path, 'storage', inserted_path), inserted_path)
+
+                self.db.print_deleted_files(func=self.diff_csv.writerow)
+
+            diff_zip.write(temp_diff_file, self.ARCHIVE_DIFF_FILE_NAME)
             diff_zip.close()
 
     def export_db_to_csv(self, csv_path, progress_count_exported_files=None) -> None:

@@ -1,67 +1,57 @@
 import os
-import shutil
-from unittest import TestCase
 from unittest.mock import patch
+
+from pyfakefs.fake_filesystem_unittest import TestCase
 
 from library_storage import LibraryStorage
 
-TEMP_DIRECTORY = os.path.expandvars(os.path.join('%TEMP%', 'test_library_storage'))
-
-
-def create_test_origin_library(library_path):
-    with open(os.path.join(library_path, 'file01.txt'), 'w') as test_file:
-        test_file.write('content01')
-
-    with open(os.path.join(library_path, 'file02.txt'), 'w') as test_file:
-        test_file.write('content02')
-
-    with open(os.path.join(library_path, 'file05.txt'), 'w') as test_file:
-        test_file.write('content05')
-
-    os.makedirs(os.path.join(library_path, 'directory01'))
-    with open(os.path.join(library_path, 'directory01', 'file03.txt'), 'w') as test_file:
-        test_file.write('content03')
-
-    with open(os.path.join(library_path, 'directory01', 'file04.txt'), 'w') as test_file:
-        test_file.write('content04')
-
-    os.makedirs(os.path.join(library_path, 'directory02'))
-    with open(os.path.join(library_path, 'directory02', 'file06.txt'), 'w') as test_file:
-        test_file.write('content06')
-
-    with open(os.path.join(library_path, 'directory02', 'file07.txt'), 'w') as test_file:
-        test_file.write('content07')
-
-    os.makedirs(os.path.join(library_path, 'directory03'))
-    with open(os.path.join(library_path, 'directory03', 'file08.txt'), 'w') as test_file:
-        test_file.write('content08')
-
-
-@patch('library_storage.TEMP_DIRECTORY', TEMP_DIRECTORY)
+@patch('library_storage.TEMP_DIRECTORY', '/')
 class CoreTestCase(TestCase):
 
+    def create_files(self, files_and_content):
+        for file_path, content in files_and_content:
+            self.fs.create_file(file_path=file_path, contents=content)
+
+    def setUp(self):
+        self.setUpPyfakefs()
+
     @classmethod
-    def setUpClass(cls) -> None:
-        cls.library_path = os.path.join(TEMP_DIRECTORY, 'origin')
-        cls.library_path_changed = os.path.join(TEMP_DIRECTORY, 'example_library_changed')
-        cls.csv_path = os.path.join(TEMP_DIRECTORY, 'example_csv')
-        cls.diff_file_path = os.path.join(TEMP_DIRECTORY, 'example_diff.zip')
+    def setUpClass(cls):
+        cls.library_path = 'origin'
+        cls.library_path_changed = 'copy'
+        cls.csv_path ='struct.csv'
+        cls.diff_file_path = 'diff.zip'
         cls.db_path = ':memory:'
-        os.chdir(cls.library_path)
-
-        if not os.path.exists(TEMP_DIRECTORY):
-            os.mkdir(TEMP_DIRECTORY)
-
-        if not os.path.exists(cls.library_path):
-            os.mkdir(cls.library_path)
-
-        create_test_origin_library(cls.library_path)
         cls.lib_storage = LibraryStorage(db_path=cls.db_path)
 
     @classmethod
-    def tearDownClass(cls) -> None:
+    def tearDownClass(cls):
         cls.lib_storage.__exit__(None, None, None)
-        shutil.rmtree(TEMP_DIRECTORY, ignore_errors=True)
 
     def test_scan_to_db(self):
+        files_and_content = (
+            ('origin/file01.txt', 'content01'),
+            ('origin/file02.txt', 'content02'),
+            ('origin/file05.txt', 'content05'),
+            ('origin/directory01/file03.txt', 'content03'),
+            ('origin/directory01/file04.txt', 'content04'),
+            ('origin/directory02/file06.txt', 'content06'),
+            ('origin/directory02/file07.txt', 'content07'),
+            ('origin/directory03/file08.txt', 'content08'),
+        )
+        self.create_files(files_and_content)
+        self.lib_storage.scan_to_db(library_path=self.library_path)
+
+    def test_scan_to_db_with_diff(self):
+        files_and_content = (
+            ('origin/file01.txt', 'content01'),
+            ('origin/file02.txt', 'content02'),
+            ('origin/file05.txt', 'content05'),
+            ('origin/directory01/file03.txt', 'content03'),
+            ('origin/directory01/file04.txt', 'content04'),
+            ('origin/directory02/file06.txt', 'content06'),
+            ('origin/directory02/file07.txt', 'content07'),
+            ('origin/directory03/file08.txt', 'content08'),
+        )
+        self.create_files(files_and_content)
         self.lib_storage.scan_to_db(library_path=self.library_path)

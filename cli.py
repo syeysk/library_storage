@@ -56,7 +56,7 @@ elif args.command == 'import':
     with LibraryStorage(db_path=db_path) as lib_storage:
         lib_storage.import_csv_to_db(struct_dir)
 
-elif args.command == 'import':
+elif args.command == 'export':
     struct_dir = os.path.abspath(args.struct)
     with LibraryStorage(db_path=db_path) as lib_storage:
         lib_storage.export_db_to_csv(struct_dir)
