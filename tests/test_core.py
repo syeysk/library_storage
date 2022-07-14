@@ -1,3 +1,5 @@
+import zipfile
+
 from pyfakefs.fake_filesystem_unittest import TestCase
 
 from library_storage import LibraryStorage
@@ -11,6 +13,16 @@ files_and_content_origin = (
     ('/origin/directory02/file06.txt', 'content06'),
     ('/origin/directory02/file07.txt', 'content07'),
     ('/origin/directory03/file08.txt', 'content08'),
+)
+diff_csv_origin = (
+    'Новый,,file01.txt\r\n'
+    'Новый,,file02.txt\r\n'
+    'Новый,,file05.txt\r\n'
+    'Новый,,directory01/file03.txt\r\n'
+    'Новый,,directory01/file04.txt\r\n'
+    'Новый,,directory02/file06.txt\r\n'
+    'Новый,,directory02/file07.txt\r\n'
+    'Новый,,directory03/file08.txt\r\n'
 )
 
 
@@ -47,3 +59,7 @@ class CoreTestCase(TestCase):
     def test_scan_to_db_with_diff(self):
         self.create_files(files_and_content_origin)
         self.lib_storage.scan_to_db(library_path='/origin', diff_file_path='/diff.zip')
+        with zipfile.ZipFile('/diff.zip', 'r') as diff_zip:
+            diff_zip.testzip()
+            with diff_zip.open(self.lib_storage.ARCHIVE_DIFF_FILE_NAME, 'r') as diff_file:
+                self.assertEqual(diff_csv_origin, str(diff_file.read(), 'utf-8'))
