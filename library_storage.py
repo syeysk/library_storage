@@ -205,7 +205,7 @@ class LibraryStorage:
             for status, existed_path, inserted_path in diffs:
                 diff_csv.writerow((status, existed_path, inserted_path))
                 if status == STATUS_NEW:
-                    diff_zip.write(os.path.join(library_path, inserted_path), inserted_path)
+                    diff_zip.write(os.path.join(library_path, inserted_path), os.path.join('storage', inserted_path))
 
                 self.db.print_deleted_files(func=diff_csv.writerow)
 
