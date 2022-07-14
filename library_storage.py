@@ -160,7 +160,6 @@ class LibraryStorage:
     def scan_to_db(
             self,
             library_path,
-            diff_file_path=None,
             delete_dublicate=False,
             progress_count_scanned_files=None
     ) -> None:
@@ -173,14 +172,13 @@ class LibraryStorage:
                 existed_directory,
                 existed_filename
             )
-
-            if diff_file_path and status != STATUS_UNTOUCHED:
-                diffs.append((status, existed_path, inserted_path))
+            if status != STATUS_UNTOUCHED:
+                self.diffs.append((status, existed_path, inserted_path))
 
         self.db.set_is_deleted()
         os.chdir(library_path)
         total_count_files = 0
-        diffs = []
+        self.diffs = []
         for directory, _, filenames in os.walk('./'):
             directory = directory[2:]
             if os.path.sep == '\\':
@@ -198,19 +196,6 @@ class LibraryStorage:
 
         self.db.insert_rows(with_id=False, func=print_file_status, delete_dublicate=delete_dublicate)
         print('Обнаружено файлов:', total_count_files, 'шт')
-        if diff_file_path:
-            diff_zip = zipfile.ZipFile(diff_file_path, 'w')
-            diff_file = StringIO()
-            diff_csv = csv.writer(diff_file)
-            for status, existed_path, inserted_path in diffs:
-                diff_csv.writerow((status, existed_path, inserted_path))
-                if status == STATUS_NEW:
-                    diff_zip.write(os.path.join(library_path, inserted_path), os.path.join('storage', inserted_path))
-
-                self.db.print_deleted_files(func=diff_csv.writerow)
-
-            diff_zip.writestr(self.ARCHIVE_DIFF_FILE_NAME, diff_file.getvalue())
-            diff_zip.close()
 
     def export_db_to_csv(self, csv_path, progress_count_exported_files=None) -> None:
         """
@@ -255,6 +240,20 @@ class LibraryStorage:
                         self.db.insert_rows()
 
         self.db.insert_rows()
+
+    def save_diff(self, library_path, diff_file_path):
+        diff_zip = zipfile.ZipFile(diff_file_path, 'w')
+        diff_file = StringIO()
+        diff_csv = csv.writer(diff_file)
+        for status, existed_path, inserted_path in self.diffs:
+            diff_csv.writerow((status, existed_path, inserted_path))
+            if status == STATUS_NEW:
+                diff_zip.write(os.path.join(library_path, inserted_path), os.path.join('storage', inserted_path))
+
+            self.db.print_deleted_files(func=diff_csv.writerow)
+
+        diff_zip.writestr(self.ARCHIVE_DIFF_FILE_NAME, diff_file.getvalue())
+        diff_zip.close()
 
     def apply_diff(self, library_path, diff_file_zip_path):
         with zipfile.ZipFile(diff_file_zip_path, 'r') as diff_zip:
