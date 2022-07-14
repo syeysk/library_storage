@@ -1,11 +1,8 @@
-import os
-from unittest.mock import patch
-
 from pyfakefs.fake_filesystem_unittest import TestCase
 
 from library_storage import LibraryStorage
 
-@patch('library_storage.TEMP_DIRECTORY', '/')
+
 class CoreTestCase(TestCase):
 
     def create_files(self, files_and_content):
@@ -14,19 +11,15 @@ class CoreTestCase(TestCase):
 
     def setUp(self):
         self.setUpPyfakefs()
+        self.lib_storage = LibraryStorage(db_path=':memory:')
 
     @classmethod
     def setUpClass(cls):
-        cls.library_path = 'origin'
         cls.library_path_changed = 'copy'
         cls.csv_path ='struct.csv'
-        cls.diff_file_path = 'diff.zip'
-        cls.db_path = ':memory:'
-        cls.lib_storage = LibraryStorage(db_path=cls.db_path)
 
-    @classmethod
-    def tearDownClass(cls):
-        cls.lib_storage.__exit__(None, None, None)
+    def tearDown(self):
+        self.lib_storage.__exit__(None, None, None)
 
     def test_scan_to_db(self):
         files_and_content = (
@@ -40,7 +33,7 @@ class CoreTestCase(TestCase):
             ('origin/directory03/file08.txt', 'content08'),
         )
         self.create_files(files_and_content)
-        self.lib_storage.scan_to_db(library_path=self.library_path)
+        self.lib_storage.scan_to_db(library_path='/origin')
 
     def test_scan_to_db_with_diff(self):
         files_and_content = (
@@ -54,4 +47,4 @@ class CoreTestCase(TestCase):
             ('origin/directory03/file08.txt', 'content08'),
         )
         self.create_files(files_and_content)
-        self.lib_storage.scan_to_db(library_path=self.library_path)
+        self.lib_storage.scan_to_db(library_path='/origin', diff_file_path='/diff.zip')

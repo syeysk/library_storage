@@ -3,7 +3,7 @@ import hashlib
 import os
 import sqlite3
 import zipfile
-from io import TextIOWrapper
+from io import TextIOWrapper, StringIO
 
 
 STATUS_NEW = 'Новый'
@@ -12,7 +12,6 @@ STATUS_RENAMED = 'Переименовали'
 STATUS_MOVED_AND_RENAMED = 'Переместили и переименовали'
 STATUS_UNTOUCHED = 'Не тронут'
 STATUS_DELETED = 'Удалён'
-TEMP_DIRECTORY = os.path.join(os.path.expandvars('%TEMP%'), 'library_storage')
 
 
 def get_file_hash(file_path):
@@ -148,9 +147,6 @@ class LibraryStorage:
         :param name:
         """
         self.db = DBStorage(db_path=db_path)
-        self.diff_csv = None
-        if not os.path.exists(TEMP_DIRECTORY):
-            os.mkdir(TEMP_DIRECTORY)
 
     def __enter__(self):
         return self
@@ -203,19 +199,17 @@ class LibraryStorage:
         self.db.insert_rows(with_id=False, func=print_file_status, delete_dublicate=delete_dublicate)
         print('Обнаружено файлов:', total_count_files, 'шт')
         if diff_file_path:
-            temp_diff_file = os.path.join(TEMP_DIRECTORY, self.ARCHIVE_DIFF_FILE_NAME)
             diff_zip = zipfile.ZipFile(diff_file_path, 'w')
-            with open(temp_diff_file, 'w', encoding='utf-8', newline='\n') as diff_file:
-                self.diff_csv = csv.writer(diff_file)
-                for status__existed_path__inserted_path in diffs:
-                    self.diff_csv.writerow(status__existed_path__inserted_path)
-                    if status__existed_path__inserted_path[0] == STATUS_NEW:
-                        inserted_path = status__existed_path__inserted_path[2]
-                        diff_zip.write(os.path.join(library_path, 'storage', inserted_path), inserted_path)
+            diff_file = StringIO()
+            diff_csv = csv.writer(diff_file)
+            for status, existed_path, inserted_path in diffs:
+                diff_csv.writerow((status, existed_path, inserted_path))
+                if status == STATUS_NEW:
+                    diff_zip.write(os.path.join(library_path, inserted_path), inserted_path)
 
-                self.db.print_deleted_files(func=self.diff_csv.writerow)
+                self.db.print_deleted_files(func=diff_csv.writerow)
 
-            diff_zip.write(temp_diff_file, self.ARCHIVE_DIFF_FILE_NAME)
+            diff_zip.writestr(self.ARCHIVE_DIFF_FILE_NAME, diff_file.getvalue())
             diff_zip.close()
 
     def export_db_to_csv(self, csv_path, progress_count_exported_files=None) -> None:
