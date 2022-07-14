@@ -246,7 +246,7 @@ class LibraryStorage:
         if csv_file:
             csv_file.close()
 
-    def import_csv_to_db(self, csv_path) -> None:
+    def import_csv_to_db(self, csv_path):
         for csv_filename in os.scandir(csv_path):
             with open(csv_filename.path, 'r', encoding='utf-8', newline='\n') as csv_file:
                 for csv_row in csv.reader(csv_file):
@@ -304,6 +304,24 @@ class LibraryStorage:
                 return STATUS_MOVED_AND_RENAMED, existed_path, inserted_path
 
             return STATUS_UNTOUCHED, existed_path, inserted_path
+
+
+def scan_storage_and_save_structure(path_to_library, path_for_save_struct):
+    with LibraryStorage(':memory:') as lib_storage:
+        lib_storage.scan_to_db(library_path=path_to_library)
+        lib_storage.export_db_to_csv(csv_path=path_for_save_struct)
+
+
+def scan_storage_and_save_diff(path_to_library, path_to_struct, path_to_save_diff):
+    with LibraryStorage(':memory:') as lib_storage:
+        lib_storage.import_csv_to_db(path_to_struct)
+        lib_storage.scan_to_db(library_path=path_to_library, diff_file_path=path_to_save_diff)
+
+
+def apply_diff(path_to_library, path_to_diff):
+    with LibraryStorage(':memory:') as lib_storage:
+        lib_storage.scan_to_db(library_path=path_to_library)
+        lib_storage.apply_diff(library_path=path_to_library, diff_file_zip_path=path_to_diff)
 
 
 if __name__ == '__main__':
