@@ -65,7 +65,8 @@ elif args.command == 'makediff':
     library_dir = os.path.abspath(args.path)
     diff_filepath = os.path.abspath(args.diff)
     with LibraryStorage(db_path=db_path) as lib_storage:
-        lib_storage.scan_to_db(library_path=library_dir, diff_file_path=diff_filepath)
+        lib_storage.scan_to_db(library_path=library_dir)
+        lib_storage.save_diff(library_path=library_dir, diff_file_path=diff_filepath)
 
 elif args.command == 'applydiff':
     library_dir = os.path.abspath(args.path)

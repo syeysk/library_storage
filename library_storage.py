@@ -43,6 +43,7 @@ class DBStorage:
             filename VARCHAR(255),
             is_deleted INT NOT NULL DEFAULT 0
         );'''
+    SQL_DELETE_FILE = 'DELETE FROM files WHERE hash=?'
 
     def __init__(self, db_path: str) -> None:
         self.c = sqlite3.connect(db_path)
@@ -129,11 +130,14 @@ class DBStorage:
         self.c.commit()
 
     def print_deleted_files(self, func):
-        for row in self.select_rows(only_deleted=True):
-            existed_directory, existed_filename = row[2:]
+        for file_hash, file_id, existed_directory, existed_filename in self.select_rows(only_deleted=True):
             existed_path = '{}/{}'.format(existed_directory, existed_filename)  # .removeprefix('/')
             existed_path = existed_path[1:] if existed_path.startswith('/') else existed_path
-            func((STATUS_DELETED, existed_path, None))
+            func((STATUS_DELETED, existed_path, None, file_hash, file_id))
+
+    def delete_file(self, file_hash):
+        self.cu.execute(self.SQL_DELETE_FILE, (file_hash, ))
+        self.c.commit()
 
 
 class LibraryStorage:
@@ -250,8 +254,7 @@ class LibraryStorage:
             if status == STATUS_NEW:
                 diff_zip.write(os.path.join(library_path, inserted_path), os.path.join('storage', inserted_path))
 
-            self.db.print_deleted_files(func=diff_csv.writerow)
-
+        self.db.print_deleted_files(func=diff_csv.writerow)
         diff_zip.writestr(self.ARCHIVE_DIFF_FILE_NAME, diff_file.getvalue())
         diff_zip.close()
 
@@ -261,7 +264,7 @@ class LibraryStorage:
             with diff_zip.open(self.ARCHIVE_DIFF_FILE_NAME, 'r') as diff_file:
                 diff_file_io = TextIOWrapper(diff_file, encoding='utf-8')
                 diff_csv = csv.reader(diff_file_io)
-                for status, existed_file, inserted_file in diff_csv:
+                for status, existed_file, inserted_file, file_hash, file_id in diff_csv:
                     if existed_file:
                         full_existed_path = os.path.join(library_path, existed_file)
                         full_existed_path = os.path.normpath(full_existed_path)
@@ -277,6 +280,7 @@ class LibraryStorage:
                         diff_zip.extract(os.path.join('storage', inserted_file), library_path)
                     elif status == STATUS_DELETED:
                         os.unlink(full_existed_path)
+                        self.db.delete_file(file_hash)
                     elif status in (STATUS_MOVED, STATUS_RENAMED, STATUS_MOVED_AND_RENAMED):
                         if os.path.exists(full_inserted_path):
                             print(status, 'Файл существует:', full_inserted_path)
@@ -288,9 +292,7 @@ class LibraryStorage:
     def print_file_status(self, inserted_directory, inserted_filename, is_exists, existed_directory, existed_filename):
         inserted_path = '{}/{}'.format(inserted_directory, inserted_filename)  # .removeprefix('/')
         inserted_path = inserted_path[1:] if inserted_path.startswith('/') else inserted_path
-        if not is_exists:
-            return STATUS_NEW, None, inserted_path
-        else:
+        if is_exists:
             existed_path = '{}/{}'.format(existed_directory, existed_filename)  # .removeprefix('/')
             existed_path = existed_path[1:] if existed_path.startswith('/') else existed_path
             is_replaced = inserted_directory != existed_directory
@@ -304,6 +306,8 @@ class LibraryStorage:
 
             return STATUS_UNTOUCHED, existed_path, inserted_path
 
+        return STATUS_NEW, None, inserted_path
+
 
 def scan_storage_and_save_structure(path_to_library, path_for_save_struct):
     with LibraryStorage(':memory:') as lib_storage:
@@ -314,7 +318,8 @@ def scan_storage_and_save_structure(path_to_library, path_for_save_struct):
 def scan_storage_and_save_diff(path_to_library, path_to_struct, path_to_save_diff):
     with LibraryStorage(':memory:') as lib_storage:
         lib_storage.import_csv_to_db(path_to_struct)
-        lib_storage.scan_to_db(library_path=path_to_library, diff_file_path=path_to_save_diff)
+        lib_storage.scan_to_db(library_path=path_to_library)
+        lib_storage.save_diff(library_path=path_to_library, diff_file_path=path_to_save_diff)
 
 
 def apply_diff(path_to_library, path_to_diff):
@@ -348,7 +353,8 @@ if __name__ == '__main__':
         lib_storage.import_csv_to_db(csv_path)
         print('Кол-во строк после импорта:', lib_storage.db.get_count_rows())
         print('\nСканируем изменённую базу...')
-        lib_storage.scan_to_db(library_path=library_path_changed, diff_file_path=diff_file_path)
+        lib_storage.scan_to_db(library_path=library_path_changed)
+        lib_storage.save_diff(library_path=library_path_changed, diff_file_path=diff_file_path)
         library_path_copy = '{}_copy'.format(library_path)
         for directory_path, directories, filenames in os.walk(library_path):
             directory_copy = directory_path[len(library_path)+1:]
