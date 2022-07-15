@@ -202,14 +202,12 @@ class LibraryStorage:
                 fiile_hash,
                 file_id,
         ):
-            status, existed_path, inserted_path, fiile_hash, file_id = self.print_file_status(
+            status, existed_path, inserted_path = self.print_file_status(
                 inserted_directory,
                 inserted_filename,
                 is_exists,
                 existed_directory,
                 existed_filename,
-                fiile_hash,
-                file_id,
             )
             if status != STATUS_UNTOUCHED:
                 self.diffs.append((status, existed_path, inserted_path, fiile_hash, file_id))
@@ -333,16 +331,7 @@ class LibraryStorage:
 
                 diff_file.close()
 
-    def print_file_status(
-            self,
-            inserted_directory,
-            inserted_filename,
-            is_exists,
-            existed_directory,
-            existed_filename,
-            fiile_hash,
-            file_id
-    ):
+    def print_file_status(self, inserted_directory, inserted_filename, is_exists, existed_directory, existed_filename):
         inserted_path = '{}/{}'.format(inserted_directory, inserted_filename)  # .removeprefix('/')
         inserted_path = inserted_path[1:] if inserted_path.startswith('/') else inserted_path
         if is_exists:
@@ -351,15 +340,15 @@ class LibraryStorage:
             is_replaced = inserted_directory != existed_directory
             is_renamed = inserted_filename != existed_filename
             if is_replaced and not is_renamed:
-                return STATUS_MOVED, existed_path, inserted_path, fiile_hash, file_id
+                return STATUS_MOVED, existed_path, inserted_path
             elif not is_replaced and is_renamed:
-                return STATUS_RENAMED, existed_path, inserted_path, fiile_hash, file_id
+                return STATUS_RENAMED, existed_path, inserted_path
             elif is_replaced and is_renamed:
-                return STATUS_MOVED_AND_RENAMED, existed_path, inserted_path, fiile_hash, file_id
+                return STATUS_MOVED_AND_RENAMED, existed_path, inserted_path
 
-            return STATUS_UNTOUCHED, existed_path, inserted_path, fiile_hash, file_id
+            return STATUS_UNTOUCHED, existed_path, inserted_path
 
-        return STATUS_NEW, None, inserted_path, fiile_hash, file_id
+        return STATUS_NEW, None, inserted_path
 
 
 def scan_storage_and_save_structure(path_to_library, path_for_save_struct):
