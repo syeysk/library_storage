@@ -45,6 +45,7 @@ class DBStorage:
         );'''
     SQL_DELETE_FILE = 'DELETE FROM files WHERE hash=?'
     SQL_INSERT_FILE = 'INSERT INTO files (hash, id, directory, filename) VALUES (?, ?, ?, ?)'
+    SQL_UPDATE_FILE = 'UPDATE files SET directory=?, filename=? WHERE hash=?'
 
     def __init__(self, db_path: str) -> None:
         self.c = sqlite3.connect(db_path)
@@ -153,6 +154,13 @@ class DBStorage:
         self.cu.execute(
             self.SQL_INSERT_FILE,
             (file_hash, file_id, os.path.dirname(inserted_file), os.path.basename(inserted_file))
+        )
+        self.c.commit()
+
+    def rename_file(self, file_hash, inserted_file):
+        self.cu.execute(
+            self.SQL_UPDATE_FILE,
+            (os.path.dirname(inserted_file), os.path.basename(inserted_file), file_hash)
         )
         self.c.commit()
 
@@ -317,6 +325,7 @@ class LibraryStorage:
                             print(status, 'Файл существует:', full_inserted_path)
 
                         os.rename(full_existed_path, full_inserted_path)
+                        self.db.rename_file(file_hash, inserted_file)
 
                 diff_file.close()
 
