@@ -52,6 +52,7 @@ class DBStorage:
         self.cu = self.c.cursor()
         self.cu.executescript(self.SQL_CREATE_TABLE)
         self.seq_sql_params = []
+        self.duplicates_by_hash = {}
 
     def clear(self) -> None:
         self.cu.execute('DELETE FROM files WHERE 1=1')
@@ -75,14 +76,13 @@ class DBStorage:
     def insert_rows(
             self,
             with_id: bool = True,
-            do_insert_new: bool = True,
             func=None,
-            delete_dublicate: bool = False
+            delete_dublicate: bool = False,
+            process_dublicate: str = 'update_and_alert'
     ) -> tuple:
         """
         Добавляет список файлов в базу
         :param with_id:
-        :param do_insert_new:
         :param func:
         :param delete_dublicate: если Истина, то будет удалять с диска файлы с одинаковым хешем,
         иначе - возбуждать исключение
@@ -96,23 +96,26 @@ class DBStorage:
             inserted_directory, inserted_filename = sql_params[2 if with_id else 1:]
             existed_directory, existed_filename = None, None
             if is_exists:
-                file_id, existed_directory, existed_filename = is_exists
-                self.cu.execute('UPDATE files SET is_deleted=0 WHERE hash=?', (file_hash,))
+                if process_dublicate == 'update_and_alert':
+                    file_id, existed_directory, existed_filename = is_exists
+                    self.cu.execute('UPDATE files SET is_deleted=0 WHERE hash=?', (file_hash,))
 
-                print('Обнаружен дубликат по хешу: {}\n    В базе:{}'.format(
-                    os.path.join(inserted_directory, inserted_filename),
-                    os.path.join(existed_directory, existed_filename),
-                ))
+                    print('Обнаружен дубликат по хешу: {}\n    В базе:{}'.format(
+                        os.path.join(inserted_directory, inserted_filename),
+                        os.path.join(existed_directory, existed_filename),
+                    ))
             else:
-                if do_insert_new:
-                    try:
-                        self.cu.execute(sql, sql_params)
-                        file_id = self.cu.lastrowid
-                    except sqlite3.IntegrityError as error:
-                        if not delete_dublicate:
-                            raise Exception('Обнаружен дубликат файла с отличающимся именем среди порции вставляемых файлов: {}'.format(error))
-
-                        print(error)  # TODO удалять файлы с разным именем, но с одинаковым хешем.
+                # try:
+                self.cu.execute(sql, sql_params)
+                file_id = self.cu.lastrowid
+                # except sqlite3.IntegrityError as error:
+                #     duplicates = self.duplicates_by_hash.get(file_hash, [])
+                #     duplicates.append(os.path.join(inserted_directory, inserted_filename))
+                #     if not delete_dublicate:
+                #         print(self.duplicates_by_hash)
+                #         raise Exception('Обнаружен дубликат файла с отличающимся именем среди порции вставляемых файлов: {}'.format(error))
+                #
+                #     print(error)  # TODO удалять файлы с разным именем, но с одинаковым хешем.
 
             if func:
                 func(

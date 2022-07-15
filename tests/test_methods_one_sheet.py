@@ -91,11 +91,6 @@ class CoreTestCase(TestCase):
         data_origin = self.origin_ls.db.cu.execute('select * from files').fetchall()
         self.assertEqual(origin_db_after_applying_diff, data_origin)
 
-    def test_scan_to_db(self):
-        self.origin_ls.scan_to_db(library_path='/origin')
-        data_origin = self.origin_ls.db.cu.execute('select * from files').fetchall()
-        self.assertEqual(ORIGIN_DB, data_origin)
-
     def test_scan_to_db_with_diff(self):
         self.origin_ls.scan_to_db(library_path='/origin')
         data_origin = self.origin_ls.db.cu.execute('select * from files').fetchall()
