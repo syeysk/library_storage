@@ -324,6 +324,10 @@ class LibraryStorage:
                         if os.path.exists(full_inserted_path):
                             print(status, 'Файл существует:', full_inserted_path)
 
+                        inserted_dirname = os.path.dirname(full_inserted_path)
+                        if not os.path.exists(inserted_dirname):
+                            os.makedirs(inserted_dirname)
+
                         os.rename(full_existed_path, full_inserted_path)
                         self.db.rename_file(file_hash, inserted_file)
 
