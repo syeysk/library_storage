@@ -65,7 +65,7 @@ class CoreTestCase(TestCase):
     def all_process(self, copy_fs, copy_db, copy_diff_csv, origin_db_after_applying_diff):
         self.create_files(copy_fs)
 
-        self.origin_ls.scan_to_db(library_path='/origin')
+        self.origin_ls.scan_to_db(library_path='/origin', process_dublicate='original')
         data_origin = self.origin_ls.db.cu.execute('select * from files').fetchall()
         self.assertEqual(ORIGIN_DB, data_origin)
 
@@ -77,7 +77,7 @@ class CoreTestCase(TestCase):
         data_copy = self.copy_ls.db.cu.execute('select * from files').fetchall()
         self.assertEqual(ORIGIN_DB, data_copy)
 
-        self.copy_ls.scan_to_db(library_path='/copy')
+        self.copy_ls.scan_to_db(library_path='/copy', process_dublicate='copy')
         data_copy = self.copy_ls.db.cu.execute('select * from files').fetchall()
         self.assertEqual(copy_db, data_copy)
 
@@ -92,7 +92,7 @@ class CoreTestCase(TestCase):
         self.assertEqual(origin_db_after_applying_diff, data_origin)
 
     def test_scan_to_db_with_diff(self):
-        self.origin_ls.scan_to_db(library_path='/origin')
+        self.origin_ls.scan_to_db(library_path='/origin', process_dublicate='original')
         data_origin = self.origin_ls.db.cu.execute('select * from files').fetchall()
         self.assertEqual(ORIGIN_DB, data_origin)
         self.origin_ls.save_diff(library_path='/origin', diff_file_path='/diff.zip')

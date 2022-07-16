@@ -108,7 +108,7 @@ class CoreTestCase(TestCase):
         ]
         self.create_files(origin_fs)
 
-        self.origin_ls.scan_to_db(library_path='/origin')
+        self.origin_ls.scan_to_db(library_path='/origin', process_dublicate='original')
         data_origin = self.origin_ls.db.cu.execute('select * from files').fetchall()
         self.assertEqual(origin_db, data_origin)
 

@@ -75,47 +75,51 @@ class DBStorage:
 
     def insert_rows(
             self,
+            process_dublicate: str,
             with_id: bool = True,
             func=None,
-            delete_dublicate: bool = False,
-            process_dublicate: str = 'update_and_alert'
-    ) -> tuple:
+    ):
         """
         Добавляет список файлов в базу
+        :param process_dublicate:
         :param with_id:
         :param func:
-        :param delete_dublicate: если Истина, то будет удалять с диска файлы с одинаковым хешем,
         иначе - возбуждать исключение
         :return:
         """
         sql = self.SQL_INSERT_ROW_WITH_ID if with_id else self.SQL_INSERT_ROW
         for sql_params in self.seq_sql_params:
             file_hash = sql_params[0]
-            sql_select = 'SELECT id, directory, filename FROM files WHERE hash=?'
+            sql_select = 'SELECT id, directory, filename, is_deleted FROM files WHERE hash=?'
             is_exists = self.cu.execute(sql_select, (file_hash,)).fetchone()
             inserted_directory, inserted_filename = sql_params[2 if with_id else 1:]
             existed_directory, existed_filename = None, None
             if is_exists:
-                if process_dublicate == 'update_and_alert':
-                    file_id, existed_directory, existed_filename = is_exists
-                    self.cu.execute('UPDATE files SET is_deleted=0 WHERE hash=?', (file_hash,))
-
-                    print('Обнаружен дубликат по хешу: {}\n    В базе:{}'.format(
-                        os.path.join(inserted_directory, inserted_filename),
+                file_id, existed_directory, existed_filename, is_deleted = is_exists
+                if process_dublicate == 'original':
+                    print('Обнаружен дубликат по хешу:\n   В базе: {}\n    Дубль: {}'.format(
                         os.path.join(existed_directory, existed_filename),
+                        os.path.join(inserted_directory, inserted_filename),
                     ))
+                elif process_dublicate == 'copy':
+                    if is_deleted:
+                        self.cu.execute('UPDATE files SET is_deleted=0 WHERE hash=?', (file_hash,))
+                    else:
+                        print('Обнаружен дубликат по хешу: {}\n    В базе:{}'.format(
+                            os.path.join(inserted_directory, inserted_filename),
+                            os.path.join(existed_directory, existed_filename),
+                        ))
+                elif process_dublicate == 'import_csv':
+                    raise Exception(
+                        'Обнаружен дубликат файла с отличающимся именем среди порции вставляемых файлов: '
+                        '{}\n    В базе:{}'.format(
+                            os.path.join(inserted_directory, inserted_filename),
+                            os.path.join(existed_directory, existed_filename),
+                        )
+                    )
             else:
-                # try:
                 self.cu.execute(sql, sql_params)
                 file_id = self.cu.lastrowid
-                # except sqlite3.IntegrityError as error:
-                #     duplicates = self.duplicates_by_hash.get(file_hash, [])
-                #     duplicates.append(os.path.join(inserted_directory, inserted_filename))
-                #     if not delete_dublicate:
-                #         print(self.duplicates_by_hash)
-                #         raise Exception('Обнаружен дубликат файла с отличающимся именем среди порции вставляемых файлов: {}'.format(error))
-                #
-                #     print(error)  # TODO удалять файлы с разным именем, но с одинаковым хешем.
 
             if func:
                 func(
@@ -192,9 +196,9 @@ class LibraryStorage:
     def scan_to_db(
             self,
             library_path,
-            delete_dublicate=False,
+            process_dublicate,
             progress_count_scanned_files=None
-    ) -> None:
+    ):
         """Сканирует информацию о файлах в директории и заносит её в базу"""
         def print_file_status(
                 inserted_directory,
@@ -232,10 +236,10 @@ class LibraryStorage:
                     progress_count_scanned_files(total_count_files)
 
                 if self.db.is_ready_for_insert():
-                    self.db.insert_rows(with_id=False, func=print_file_status, delete_dublicate=delete_dublicate)
+                    self.db.insert_rows(with_id=False, func=print_file_status, process_dublicate=process_dublicate)
 
-        self.db.insert_rows(with_id=False, func=print_file_status, delete_dublicate=delete_dublicate)
-        print('Обнаружено файлов:', total_count_files, 'шт')
+        self.db.insert_rows(with_id=False, func=print_file_status, process_dublicate=process_dublicate)
+        # print('Обнаружено файлов:', total_count_files, 'шт')
 
     def export_db_to_csv(self, csv_path, progress_count_exported_files=None) -> None:
         """
@@ -279,7 +283,7 @@ class LibraryStorage:
                     if self.db.is_ready_for_insert():
                         self.db.insert_rows()
 
-        self.db.insert_rows()
+        self.db.insert_rows(process_dublicate='import_csv')
 
     def save_diff(self, library_path, diff_file_path):
         diff_zip = zipfile.ZipFile(diff_file_path, 'w')
