@@ -105,9 +105,9 @@ class DBStorage:
                     if is_deleted:
                         self.cu.execute('UPDATE files SET is_deleted=0 WHERE hash=?', (file_hash,))
                     else:
-                        print('Обнаружен дубликат по хешу: {}\n    В базе:{}'.format(
-                            os.path.join(inserted_directory, inserted_filename),
+                        print('Обнаружен дубликат по хешу:\n   В базе: {}\n    Дубль: {}'.format(
                             os.path.join(existed_directory, existed_filename),
+                            os.path.join(inserted_directory, inserted_filename),
                         ))
                 elif process_dublicate == 'import_csv':
                     raise Exception(
