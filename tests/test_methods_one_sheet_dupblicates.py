@@ -1,4 +1,4 @@
-import zipfile
+from unittest.mock import patch, Mock
 
 from pyfakefs.fake_filesystem_unittest import TestCase
 
@@ -94,23 +94,20 @@ class CoreTestCase(TestCase):
             ('30273fefb11ee96b052b34051985952ff551b77bde97ba11c79b7b8ab3dc2a16', 7, 'directory02', 'file07.txt', 0),
             ('5491aedaa8d92e62f28117a5d5a751c31c917ed05ffd974cd433fd5a9834c554', 8, 'directory03', 'file08.txt', 0),
         ]
-        copy_diff_csv = (
-            'Удалён,file02.txt,,982dfb44d32c54183e5399ae180a701d70c1434736645eea98c23e6a81b99d1b,2\n'
-            'Удалён,directory02/file07.txt,,30273fefb11ee96b052b34051985952ff551b77bde97ba11c79b7b8ab3dc2a16,7\n'
-        )
-        origin_db_after_applying_diff = [
-            ('4256508e9e2099aa72050b5e00d01745153971e915fa190e4a86079a13ab8e73', 1, '', 'file01.txt', 0),
-            ('ecefb01d5d2f2cce6d2f51257e4d17b480aec572496cb6b2136740704529f35f', 3, '', 'file05.txt', 0),
-            ('78f690041494259dbb0ca8e890b9464599f5fc1eeaad20de7c4c16b7761c0039', 4, 'directory01', 'file03.txt', 0),
-            ('90acddd186ee9932103da80265a716c2340cbaeeecaaa1da18b78d8e02f97e72', 5, 'directory01', 'file04.txt', 0),
-            ('186bf48b6b0d045b57d29f6961eb7fd10710cfdcd745384ba0c8015e11eb2363', 6, 'directory02', 'file06.txt', 0),
-            ('5491aedaa8d92e62f28117a5d5a751c31c917ed05ffd974cd433fd5a9834c554', 8, 'directory03', 'file08.txt', 0),
-        ]
         self.create_files(origin_fs)
 
-        self.origin_ls.scan_to_db(library_path='/origin', process_dublicate='original')
-        data_origin = self.origin_ls.db.cu.execute('select * from files').fetchall()
-        self.assertEqual(origin_db, data_origin)
+        with patch('builtins.print') as mock_print:
+            self.origin_ls.scan_to_db(library_path='/origin', process_dublicate='original')
+            data_origin = self.origin_ls.db.cu.execute('select * from files').fetchall()
+            self.assertEqual(origin_db, data_origin)
+            self.assertEqual(1, mock_print.call_count)
+            self.assertEqual(
+                'Обнаружен дубликат по хешу:\n'
+                '   В базе: directory01\\file04.txt\n'
+                '    Дубль: directory01111\\file04_duplicate.txt',
+                mock_print.mock_calls[0].args[0],
+            )
+
 
     # def test_all_process_dublicate(self):
     #     copy_fs = (
