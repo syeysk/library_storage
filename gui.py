@@ -1,6 +1,6 @@
 from os import curdir, path, makedirs
 from threading import Thread
-from tkinter import GROOVE, LEFT, RIGHT, TOP, Frame, StringVar, Tk, filedialog
+from tkinter import GROOVE, LEFT, RIGHT, TOP, Frame, StringVar, Tk, W, filedialog
 from tkinter.ttk import Button, Label, Radiobutton, Separator
 
 from library_storage import LibraryStorage
@@ -17,6 +17,9 @@ class GUI(Tk):
 
         self.storage_directory_copy = None
         self.diff_file_path = None
+
+        self.btn_command_scan_directory = None
+        self.btn_command_load_structure = None
 
     def progress_count_exported_files(self, number_of_current_row, count_rows, csv_current_page):
         text = '{}/{} Страниц: {}'.format(number_of_current_row, count_rows, csv_current_page)
@@ -37,8 +40,7 @@ class GUI(Tk):
         self.lib_storage.select_db(self.storage_db)
         self.lib_storage.scan_to_db(
             self.storage_directory,
-            diff_file_path=None,
-            delete_dublicate=False,
+            process_dublicate='original',
             progress_count_scanned_files=self.progress_count_scanned_files
         )
 
@@ -160,41 +162,59 @@ class GUI(Tk):
         thread.start()
         self.check_command_generate_diff(thread)
 
+    def hide_btn_command_scan_directory(self):
+        self.btn_command_load_structure.state(['active', '!disabled'])
+        self.btn_command_scan_directory.state(['!active', 'disabled'])
+
+    def hide_command_load_structure(self):
+        self.btn_command_load_structure.state(['!active', 'disabled'])
+        self.btn_command_scan_directory.state(['active', '!disabled'])
+
     def create_window(self):
-        self.title("SYeysk LibraryStorage")
+        self.title('SYeysk LibraryStorage')
 
         # Оригинальное хранилище
 
         frame_input = Frame(self, relief=GROOVE, borderwidth=2, padx=10, pady=5)
 
+        Label(frame_input, text='Хранилище').pack(side=TOP)
+
+        frame_original_directory = Frame(frame_input)
+        rb_type_scan_files = Radiobutton(frame_original_directory, variable=self.type_scan, text='Директория:', value='files', command=self.hide_command_load_structure)
+        rb_type_scan_files.pack(side=LEFT)
+        btn_select_storage_directory = Button(
+            frame_original_directory,
+            text="Открыть",
+            command=self.select_storage_directory
+        )
+        btn_select_storage_directory.pack(side=LEFT)
+        self.val_storage_directory = Label(frame_original_directory, text='')
+        self.val_storage_directory.pack(side=LEFT)
+        frame_original_directory.pack(side=TOP, anchor=W)
+
+        frame_original_structure = Frame(frame_input)
+        rb_type_scan_structure = Radiobutton(frame_original_structure, variable=self.type_scan, text='Структура:', value='structure', command=self.hide_btn_command_scan_directory)
+        rb_type_scan_structure.pack(side=LEFT)
+        self.val_structure = Label(frame_original_structure, text='')
+        self.val_structure.pack(side=LEFT)
+        frame_original_structure.pack(side=TOP, anchor=W)
+
+
         frame_input_radios = Frame(frame_input)
-        rb_type_scan_files = Radiobutton(frame_input_radios, variable=self.type_scan, text='файлы', value='files')
-        rb_type_scan_files.pack(side=TOP)
-        rb_type_scan_structure = Radiobutton(frame_input_radios, variable=self.type_scan, text='структура', value='structure')
-        rb_type_scan_structure.pack(side=TOP)
         frame_input_radios.pack(side=LEFT)
 
         frame_input_actions = Frame(frame_input)
 
-        frame_input_labels = Frame(frame_input_actions)
-        lbl_storage_directory = Label(frame_input_labels, text="Хранилище:")
-        lbl_storage_directory.pack(side=LEFT)
-        self.val_storage_directory = Label(frame_input_labels, text="")
-        self.val_storage_directory.pack(side=LEFT)
-        frame_input_labels.pack()
-
         frame_input_buttons = Frame(frame_input_actions)
-        btn_select_storage_directory = Button(
-            frame_input_buttons,
-            text="Открыть хранилище",
-            command=self.select_storage_directory
-        )
-        btn_select_storage_directory.pack(side=LEFT)
-        btn_command_scan = Button(frame_input_buttons, text="Сканировать", command=self.command_scan)
-        btn_command_scan.pack(side=LEFT)
+        self.btn_command_scan_directory = Button(frame_input_buttons, text='Сканировать директорию', command=self.command_scan)
+        self.btn_command_scan_directory.pack(side=LEFT)
+        self.btn_command_load_structure = Button(frame_input_buttons, text='Загрузить структуру', command=None)
+        self.btn_command_load_structure.pack(side=LEFT)
         frame_input_buttons.pack()
-        btn_command_export = Button(frame_input_buttons, text="Экспорт", command=self.command_export)
+        btn_command_export = Button(frame_input_buttons, text='Экспорт', command=self.command_export)
         btn_command_export.pack()
+
+        rb_type_scan_files.invoke()
 
         frame_input_actions.pack(side=LEFT)
         frame_input.pack()
@@ -205,21 +225,17 @@ class GUI(Tk):
         # Статистика
 
         frame_statistic = Frame(self, relief=GROOVE, borderwidth=2, padx=10, pady=5)
-        lbl_structure = Label(frame_statistic, text="Структура хранилища:", justify=LEFT)
-        lbl_structure.pack(side=TOP)
-        self.val_structure = Label(frame_statistic, text="")
-        self.val_structure.pack(side=TOP)
-        lbl_stat_db_path = Label(frame_statistic, text="База хранилища:")
+        lbl_stat_db_path = Label(frame_statistic, text='База хранилища:')
         lbl_stat_db_path.pack(side=TOP)
-        self.val_stat_db_path = Label(frame_statistic, text="")
+        self.val_stat_db_path = Label(frame_statistic, text='')
         self.val_stat_db_path.pack(side=TOP)
-        lbl_stat_count_files = Label(frame_statistic, text="Файлов отсканировано:")
+        lbl_stat_count_files = Label(frame_statistic, text='Файлов отсканировано:')
         lbl_stat_count_files.pack(side=TOP)
-        self.val_stat_count_files = Label(frame_statistic, text="")
+        self.val_stat_count_files = Label(frame_statistic, text='')
         self.val_stat_count_files.pack(side=TOP)
-        lbl_stat_count_exported_files = Label(frame_statistic, text="Файлов экспортировано:")
+        lbl_stat_count_exported_files = Label(frame_statistic, text='Файлов экспортировано:')
         lbl_stat_count_exported_files.pack(side=TOP)
-        self.val_stat_count_exported_files = Label(frame_statistic, text="")
+        self.val_stat_count_exported_files = Label(frame_statistic, text='')
         self.val_stat_count_exported_files.pack(side=TOP)
 
         frame_statistic.pack()
@@ -230,15 +246,15 @@ class GUI(Tk):
 
         # не записывать удалённые: если это копия и мы хотим удалить из оригинпала отсутствующие в копии файлы
         frame_input_labels_copy = Frame(frame_input_copy)
-        lbl_storage_directory_copy = Label(frame_input_labels_copy, text="Хранилище (копия):")
+        lbl_storage_directory_copy = Label(frame_input_labels_copy, text='Хранилище (копия):')
         lbl_storage_directory_copy.pack(side=LEFT)
-        self.val_storage_directory_copy = Label(frame_input_labels_copy, text="")
+        self.val_storage_directory_copy = Label(frame_input_labels_copy, text='')
         self.val_storage_directory_copy.pack(side=LEFT)
         frame_input_labels_copy.pack()
 
         btn_select_storage_directory_copy = Button(
             frame_input_copy,
-            text="Открыть хранилище",
+            text='Открыть хранилище',
             command=self.select_storage_directory_copy
         )
         btn_select_storage_directory_copy.pack()
@@ -246,7 +262,7 @@ class GUI(Tk):
         frame_input_copy_buttons = Frame(frame_input_copy)
         btn_select_storage_directory = Button(
             frame_input_copy_buttons,
-            text="Сгенерировать diff-файл",
+            text='Сгенерировать diff-файл',
             command=self.command_generate_diff
         )
         btn_select_storage_directory.pack(side=LEFT)
