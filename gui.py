@@ -98,8 +98,8 @@ class GUI(Tk):
         else:
             print('Пожалуйста, выберите директорию структуры')
 
-    def select_storage_directory(self):
-        type_scan = self.type_scan.get()
+    def select_storage(self, type_scan):
+        #type_scan = self.type_scan.get()
         if type_scan == 'files':
             self.storage_directory = filedialog.askdirectory(initialdir=curdir)
             if not self.storage_directory:
@@ -128,7 +128,13 @@ class GUI(Tk):
         total_scanned_files = self.lib_storage.db.get_count_rows()
         self.progress_count_scanned_files(total_scanned_files)
 
-    def select_storage_directory_copy(self):
+    def select_storage_directory(self):
+        self.select_storage('files')
+
+    def select_storage_structure(self):
+        self.select_storage('structure')
+
+    def select_storage_structure_copy(self):
         self.storage_directory_copy = filedialog.askdirectory(initialdir=curdir)
         if not self.storage_directory_copy:
             return
@@ -179,56 +185,78 @@ class GUI(Tk):
 
         Label(frame_input, text='Хранилище').pack(side=TOP)
 
-        frame_original_directory = Frame(frame_input)
-        rb_type_scan_files = Radiobutton(frame_original_directory, variable=self.type_scan, text='Директория:', value='files', command=self.hide_command_load_structure)
-        rb_type_scan_files.pack(side=LEFT)
-        btn_select_storage_directory = Button(
-            frame_original_directory,
-            text="Открыть",
+        frame_original = Frame(frame_input)
+        Button(
+            frame_original,
+            text='Открыть директорию',
             command=self.select_storage_directory
-        )
-        btn_select_storage_directory.pack(side=LEFT)
+        ).pack(side=LEFT)
+        Button(
+            frame_original,
+            text='Открыть структуру',
+            command=self.select_storage_structure
+        ).pack(side=LEFT)
+        frame_original.pack(side=TOP, anchor=W)
+
+        frame_original_directory = Frame(frame_input)
+        # rb_type_scan_files = Radiobutton(frame_original_directory, variable=self.type_scan, text='Директория:', value='files', command=self.hide_command_load_structure)
+        # rb_type_scan_files.pack(side=LEFT)
+        rb_type_scan_files = Label(frame_original_directory, text='Директория:')
+        rb_type_scan_files.pack(side=LEFT)
         self.val_storage_directory = Label(frame_original_directory, text='')
         self.val_storage_directory.pack(side=LEFT)
         frame_original_directory.pack(side=TOP, anchor=W)
 
         frame_original_structure = Frame(frame_input)
-        rb_type_scan_structure = Radiobutton(frame_original_structure, variable=self.type_scan, text='Структура:', value='structure', command=self.hide_btn_command_scan_directory)
+        # rb_type_scan_structure = Radiobutton(frame_original_structure, variable=self.type_scan, text='Структура:', value='structure', command=self.hide_btn_command_scan_directory)
+        # rb_type_scan_structure.pack(side=LEFT)
+        rb_type_scan_structure = Label(frame_original_structure, text='Структура:')
         rb_type_scan_structure.pack(side=LEFT)
         self.val_structure = Label(frame_original_structure, text='')
         self.val_structure.pack(side=LEFT)
         frame_original_structure.pack(side=TOP, anchor=W)
 
 
-        frame_input_radios = Frame(frame_input)
-        frame_input_radios.pack(side=LEFT)
+        # frame_input_radios = Frame(frame_input)
+        # frame_input_radios.pack(side=LEFT)
 
         frame_input_actions = Frame(frame_input)
 
         frame_input_buttons = Frame(frame_input_actions)
         self.btn_command_scan_directory = Button(frame_input_buttons, text='Сканировать директорию', command=self.command_scan)
         self.btn_command_scan_directory.pack(side=LEFT)
-        self.btn_command_load_structure = Button(frame_input_buttons, text='Загрузить структуру', command=None)
-        self.btn_command_load_structure.pack(side=LEFT)
+        # self.btn_command_load_structure = Button(frame_input_buttons, text='Загрузить структуру', command=None)
+        # self.btn_command_load_structure.pack(side=LEFT)
         frame_input_buttons.pack()
         btn_command_export = Button(frame_input_buttons, text='Экспорт', command=self.command_export)
         btn_command_export.pack()
 
-        rb_type_scan_files.invoke()
+        # rb_type_scan_files.invoke()
 
         frame_input_actions.pack(side=LEFT)
-        frame_input.pack()
+        frame_input.pack(side=LEFT)
+
+        # Копия хранилища
+
+        frame_input_copy2 = Frame(self, relief=GROOVE, borderwidth=2, padx=10, pady=5)
+        btn_select_storage_directory_copy = Button(
+            frame_input_copy2,
+            text='Открыть структуру',
+            command=self.select_storage_structure_copy
+        )
+        btn_select_storage_directory_copy.pack()
+        frame_input_copy2.pack(side=LEFT)
 
         separator = Separator(self, orient='horizontal')
         separator.pack()
 
         # Статистика
 
-        frame_statistic = Frame(self, relief=GROOVE, borderwidth=2, padx=10, pady=5)
-        lbl_stat_db_path = Label(frame_statistic, text='База хранилища:')
-        lbl_stat_db_path.pack(side=TOP)
-        self.val_stat_db_path = Label(frame_statistic, text='')
+        Label(self, text='База хранилища:').pack(side=TOP)
+        self.val_stat_db_path = Label(self, text='')
         self.val_stat_db_path.pack(side=TOP)
+
+        frame_statistic = Frame(self, relief=GROOVE, borderwidth=2, padx=10, pady=5)
         lbl_stat_count_files = Label(frame_statistic, text='Файлов отсканировано:')
         lbl_stat_count_files.pack(side=TOP)
         self.val_stat_count_files = Label(frame_statistic, text='')
@@ -251,13 +279,6 @@ class GUI(Tk):
         self.val_storage_directory_copy = Label(frame_input_labels_copy, text='')
         self.val_storage_directory_copy.pack(side=LEFT)
         frame_input_labels_copy.pack()
-
-        btn_select_storage_directory_copy = Button(
-            frame_input_copy,
-            text='Открыть хранилище',
-            command=self.select_storage_directory_copy
-        )
-        btn_select_storage_directory_copy.pack()
 
         frame_input_copy_buttons = Frame(frame_input_copy)
         btn_select_storage_directory = Button(
