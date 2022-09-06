@@ -1,7 +1,7 @@
 from os import curdir, path, makedirs
 from threading import Thread
-from tkinter import GROOVE, LEFT, RIGHT, TOP, Frame, StringVar, Tk, W, filedialog
-from tkinter.ttk import Button, Label, Radiobutton, Separator
+from tkinter import GROOVE, LEFT, RIGHT, TOP, Frame, LabelFrame, StringVar, Tk, W, filedialog, Toplevel, VERTICAL, Canvas, Y, ALL
+from tkinter.ttk import Button, Label, Radiobutton, Separator, Notebook, Scrollbar
 
 from library_storage import LibraryStorage
 
@@ -63,6 +63,7 @@ class GUI(Tk):
                 print('Пожалуйста, выберите директорию хранилища')
                 return
 
+            window = self.create_window_scan()
             thread = Thread(None, self.fg_command_scan_files)
             thread.start()
             self.check_command_scan_files(thread)
@@ -71,6 +72,7 @@ class GUI(Tk):
                 print('Пожалуйста, выберите директорию хранилища')
                 return
 
+            window = self.create_window_scan()
             thread = Thread(None, self.fg_command_scan_structure)
             thread.start()
             self.check_command_scan_structure(thread)
@@ -176,14 +178,52 @@ class GUI(Tk):
         self.btn_command_load_structure.state(['!active', 'disabled'])
         self.btn_command_scan_directory.state(['active', '!disabled'])
 
+    def create_window_scan(self):
+        window_scan = Toplevel(self)
+        notebook = Notebook(window_scan, height=200)
+        notebook.pack()
+
+        _frame_dublicates = Frame(notebook)
+        v = Scrollbar(_frame_dublicates, orient=VERTICAL)
+        canvas = Canvas(_frame_dublicates, height=200, yscrollcommand=v.set)
+        v.configure(command=canvas.yview)
+        frame_dublicates = Frame(canvas)
+        canvas.create_window((0, 0), window=frame_dublicates)
+        frame_dublicates.pack()
+        canvas.pack(side=LEFT)
+        v.pack(side=RIGHT, fill=Y)
+
+        frame_info = Frame(notebook)
+
+        def resize(event):
+            region = canvas.bbox(ALL)
+            canvas.configure(scrollregion=region)
+
+        self.bind('<Configure>', resize)
+
+        for i in range(30):
+            Label(frame_dublicates, text=f'line {i}').pack()
+
+        for i in range(20):
+            Label(frame_info, text=f'line {i}').pack()
+
+        resize(None)
+        self.update_idletasks()
+        self.minsize(100, 100)
+
+        notebook.add(_frame_dublicates, text='Дубликаты')
+        notebook.add(frame_info, text='Прочее')
+
+        return window_scan
+
     def create_window(self):
         self.title('SYeysk LibraryStorage')
 
         # Оригинальное хранилище
 
-        frame_input = Frame(self, relief=GROOVE, borderwidth=2, padx=10, pady=5)
+        frame_inputs = Frame(self)
 
-        Label(frame_input, text='Хранилище').pack(side=TOP)
+        frame_input = LabelFrame(frame_inputs, text='Хранилище оригинальное', relief=GROOVE, borderwidth=2, padx=10, pady=5)
 
         frame_original = Frame(frame_input)
         Button(
@@ -234,11 +274,11 @@ class GUI(Tk):
         # rb_type_scan_files.invoke()
 
         frame_input_actions.pack(side=LEFT)
-        frame_input.pack(side=LEFT)
+        frame_input.pack(side=LEFT, padx=5, pady=5)
 
         # Копия хранилища
 
-        frame_input_copy2 = Frame(self, relief=GROOVE, borderwidth=2, padx=10, pady=5)
+        frame_input_copy2 = LabelFrame(frame_inputs, text='Хранилище - копия', relief=GROOVE, borderwidth=2, padx=10, pady=5)
         btn_select_storage_directory_copy = Button(
             frame_input_copy2,
             text='Открыть структуру',
@@ -249,6 +289,8 @@ class GUI(Tk):
 
         separator = Separator(self, orient='horizontal')
         separator.pack()
+        
+        frame_inputs.pack(padx=5, pady=5)
 
         # Статистика
 
@@ -274,8 +316,6 @@ class GUI(Tk):
 
         # не записывать удалённые: если это копия и мы хотим удалить из оригинпала отсутствующие в копии файлы
         frame_input_labels_copy = Frame(frame_input_copy)
-        lbl_storage_directory_copy = Label(frame_input_labels_copy, text='Хранилище (копия):')
-        lbl_storage_directory_copy.pack(side=LEFT)
         self.val_storage_directory_copy = Label(frame_input_labels_copy, text='')
         self.val_storage_directory_copy.pack(side=LEFT)
         frame_input_labels_copy.pack()
@@ -291,9 +331,7 @@ class GUI(Tk):
         # btn_command_scan.pack(side=LEFT)
         frame_input_copy_buttons.pack(side=TOP)
 
-
         frame_input_copy.pack()
-
 
 
 with LibraryStorage(db_path='') as lib_storage:
