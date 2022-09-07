@@ -78,12 +78,14 @@ class DBStorage:
             process_dublicate: str,
             with_id: bool = True,
             func=None,
+            func_dublicate=None,
     ):
         """
         Добавляет список файлов в базу
         :param process_dublicate:
         :param with_id:
         :param func:
+        :param func_dublicate:
         иначе - возбуждать исключение
         :return:
         """
@@ -101,6 +103,11 @@ class DBStorage:
                         os.path.join(existed_directory, existed_filename),
                         os.path.join(inserted_directory, inserted_filename),
                     ))
+                    if func_dublicate:
+                        func_dublicate(
+                            os.path.join(existed_directory, existed_filename),
+                            os.path.join(inserted_directory, inserted_filename),
+                        )
                 elif process_dublicate == 'copy':
                     if is_deleted:
                         self.cu.execute('UPDATE files SET is_deleted=0 WHERE hash=?', (file_hash,))
@@ -197,7 +204,8 @@ class LibraryStorage:
             self,
             library_path,
             process_dublicate,
-            progress_count_scanned_files=None
+            progress_count_scanned_files=None,
+            func_dublicate=None,
     ):
         """Сканирует информацию о файлах в директории и заносит её в базу"""
         def print_file_status(
@@ -236,9 +244,19 @@ class LibraryStorage:
                     progress_count_scanned_files(total_count_files)
 
                 if self.db.is_ready_for_insert():
-                    self.db.insert_rows(with_id=False, func=print_file_status, process_dublicate=process_dublicate)
+                    self.db.insert_rows(
+                        with_id=False,
+                        func=print_file_status,
+                        process_dublicate=process_dublicate,
+                        func_dublicate=func_dublicate,
+                    )
 
-        self.db.insert_rows(with_id=False, func=print_file_status, process_dublicate=process_dublicate)
+        self.db.insert_rows(
+            with_id=False,
+            func=print_file_status,
+            process_dublicate=process_dublicate,
+            func_dublicate=func_dublicate,
+        )
         # print('Обнаружено файлов:', total_count_files, 'шт')
 
     def export_db_to_csv(self, csv_path, progress_count_exported_files=None) -> None:

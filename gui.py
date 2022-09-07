@@ -1,7 +1,7 @@
 from os import curdir, path, makedirs
 from threading import Thread
-from tkinter import GROOVE, LEFT, RIGHT, TOP, Frame, LabelFrame, StringVar, Tk, W, filedialog, Toplevel, VERTICAL, \
-    Canvas, Y, ALL, BOTH, NW
+from tkinter import (GROOVE, LEFT, RIGHT, TOP, Frame, LabelFrame, StringVar, Tk, W, filedialog, Toplevel, VERTICAL,
+    Canvas, Y, ALL, BOTH, NW, X)
 from tkinter.ttk import Button, Label, Radiobutton, Separator, Notebook, Scrollbar
 
 from library_storage import LibraryStorage
@@ -51,7 +51,6 @@ class GUI(Tk):
     def check_command_scan_files(self, thread):
         if thread.is_alive():
             self.after(1000, self.check_command_scan_files, thread)
-            # print('поток выполняется')
         else:
             print('поток завершён')
             self.lib_storage.select_db(self.storage_db)
@@ -61,13 +60,13 @@ class GUI(Tk):
         self.lib_storage.scan_to_db(
             self.storage_directory,
             process_dublicate='original',
-            progress_count_scanned_files=self.progress_count_scanned_files
+            progress_count_scanned_files=self.progress_count_scanned_files,
+            func_dublicate=self.add_dublicate_file_frame
         )
 
     def check_command_scan_structure(self, thread):
         if thread.is_alive():
             self.after(1000, self.check_command_scan_structure, thread)
-            # print('поток выполняется')
         else:
             print('поток завершён')
             self.lib_storage.select_db(self.storage_db)
@@ -198,19 +197,37 @@ class GUI(Tk):
         self.btn_command_load_structure.state(['!active', 'disabled'])
         self.btn_command_scan_directory.state(['active', '!disabled'])
 
+    def add_dublicate_file_frame(self, existed_filepath, inserted_filepath):
+        frame = Frame(self.frame_dublicates, relief=GROOVE, borderwidth=2, padx=10, pady=5)
+        frame.pack(fill=X)
+
+        frame1 = Frame(frame)
+        frame1.pack(anchor=W)
+        button1 = Button(frame1, text='Удалить')
+        button1.pack(side=LEFT)
+        existed_label = Label(frame1, text=existed_filepath)
+        existed_label.pack(side=LEFT)
+
+        frame2 = Frame(frame)
+        frame2.pack(anchor=W)
+        button2 = Button(frame2, text='Удалить')
+        button2.pack(side=LEFT)
+        inserted_label = Label(frame2, text=inserted_filepath)
+        inserted_label.pack(side=LEFT)
+
     def create_window_scan(self):
         window_scan = Toplevel(self)
         notebook = Notebook(window_scan)
         notebook.pack(fill=BOTH, expand=1)
 
-        container_dublicates, frame_dublicates = build_scrollable_frame(notebook)
-        container_info, frame_info = build_scrollable_frame(notebook)
+        container_dublicates, self.frame_dublicates = build_scrollable_frame(notebook)
+        container_info, self.frame_info = build_scrollable_frame(notebook)
 
-        for i in range(30):
-            Label(frame_dublicates, text=f'line {i}').pack()
+        # for i in range(30):
+        #     Label(self.frame_dublicates, text=f'line {i}').pack()
 
         for i in range(20):
-            Label(frame_info, text=f'line {i}').pack()
+            Label(self.frame_info, text=f'line {i}').pack()
 
         notebook.add(container_dublicates, text='Дубликаты')
         notebook.add(container_info, text='Прочее')
