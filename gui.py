@@ -1,9 +1,29 @@
 from os import curdir, path, makedirs
 from threading import Thread
-from tkinter import GROOVE, LEFT, RIGHT, TOP, Frame, LabelFrame, StringVar, Tk, W, filedialog, Toplevel, VERTICAL, Canvas, Y, ALL
+from tkinter import GROOVE, LEFT, RIGHT, TOP, Frame, LabelFrame, StringVar, Tk, W, filedialog, Toplevel, VERTICAL, \
+    Canvas, Y, ALL, BOTH, NW
 from tkinter.ttk import Button, Label, Radiobutton, Separator, Notebook, Scrollbar
 
 from library_storage import LibraryStorage
+
+
+def build_scrollable_frame(master):
+    # Crrate a main Frame
+    container = Frame(master)
+    # Create a Canvas to the main frame
+    canvas = Canvas(container)
+    canvas.pack(side=LEFT, fill=BOTH, expand=1)
+    # Create a Scrollbar to the main frame
+    scrollbar = Scrollbar(container, orient=VERTICAL, command=canvas.yview)
+    scrollbar.pack(side=RIGHT, fill=Y)
+    # Configure the Canvas
+    canvas.configure(yscrollcommand=scrollbar.set)
+    canvas.bind('<Configure>', lambda event: canvas.configure(scrollregion=canvas.bbox(ALL)))
+    # Create another Frame inside the Canvas
+    child = Frame(canvas)
+    # Add that new Frame to a window in the Canvas
+    canvas.create_window((0, 0), window=child, anchor=NW)
+    return container, child
 
 
 class GUI(Tk):
@@ -180,26 +200,11 @@ class GUI(Tk):
 
     def create_window_scan(self):
         window_scan = Toplevel(self)
-        notebook = Notebook(window_scan, height=200)
-        notebook.pack()
+        notebook = Notebook(window_scan)
+        notebook.pack(fill=BOTH, expand=1)
 
-        _frame_dublicates = Frame(notebook)
-        v = Scrollbar(_frame_dublicates, orient=VERTICAL)
-        canvas = Canvas(_frame_dublicates, height=200, yscrollcommand=v.set)
-        v.configure(command=canvas.yview)
-        frame_dublicates = Frame(canvas)
-        canvas.create_window((0, 0), window=frame_dublicates)
-        frame_dublicates.pack()
-        canvas.pack(side=LEFT)
-        v.pack(side=RIGHT, fill=Y)
-
-        frame_info = Frame(notebook)
-
-        def resize(event):
-            region = canvas.bbox(ALL)
-            canvas.configure(scrollregion=region)
-
-        self.bind('<Configure>', resize)
+        container_dublicates, frame_dublicates = build_scrollable_frame(notebook)
+        container_info, frame_info = build_scrollable_frame(notebook)
 
         for i in range(30):
             Label(frame_dublicates, text=f'line {i}').pack()
@@ -207,12 +212,8 @@ class GUI(Tk):
         for i in range(20):
             Label(frame_info, text=f'line {i}').pack()
 
-        resize(None)
-        self.update_idletasks()
-        self.minsize(100, 100)
-
-        notebook.add(_frame_dublicates, text='Дубликаты')
-        notebook.add(frame_info, text='Прочее')
+        notebook.add(container_dublicates, text='Дубликаты')
+        notebook.add(container_info, text='Прочее')
 
         return window_scan
 
