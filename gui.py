@@ -27,9 +27,29 @@ def build_scrollable_frame(master):
     return container, child
 
 
-class GUI(Tk):
-    def __init__(self, lib_storage):
+class BasicGUI(Tk):
+    def __init__(self):
         Tk.__init__(self)
+
+    def run_func_in_thread(self, func, finish_func=None):
+        def check():
+            if thread.is_alive():
+                print('поток продолжается')
+                self.after(1000, check)
+            else:
+                print('поток завершён')
+                # action after finishing thread
+                if finish_func:
+                    finish_func()
+
+        thread = Thread(None, func)
+        thread.start()
+        check()
+
+
+class GUI(BasicGUI):
+    def __init__(self, lib_storage):
+        BasicGUI.__init__(self)
         self.lib_storage = lib_storage
         self.storage_db = ''
         self.storage_directory = None
@@ -49,13 +69,6 @@ class GUI(Tk):
     def progress_count_scanned_files(self, total_scanned_files):
         self.val_stat_count_files.configure(text=total_scanned_files)
 
-    def check_command_scan_files(self, thread):
-        if thread.is_alive():
-            self.after(1000, self.check_command_scan_files, thread)
-        else:
-            print('поток завершён')
-            self.lib_storage.select_db(self.storage_db)
-
     def fg_command_scan_files(self):
         self.lib_storage.select_db(self.storage_db)
         self.lib_storage.scan_to_db(
@@ -64,13 +77,6 @@ class GUI(Tk):
             progress_count_scanned_files=self.progress_count_scanned_files,
             func_dublicate=self.add_dublicate_file_frame
         )
-
-    def check_command_scan_structure(self, thread):
-        if thread.is_alive():
-            self.after(1000, self.check_command_scan_structure, thread)
-        else:
-            print('поток завершён')
-            self.lib_storage.select_db(self.storage_db)
 
     def fg_command_scan_structure(self):
         self.lib_storage.select_db(self.storage_db)
@@ -84,26 +90,14 @@ class GUI(Tk):
                 return
 
             window = self.create_window_scan()
-            thread = Thread(None, self.fg_command_scan_files)
-            thread.start()
-            self.check_command_scan_files(thread)
+            self.run_func_in_thread(self.fg_command_scan_files, lambda: self.lib_storage.select_db(self.storage_db))
         elif type_scan == 'structure':
             if not self.storage_structure:
                 print('Пожалуйста, выберите директорию хранилища')
                 return
 
             window = self.create_window_scan()
-            thread = Thread(None, self.fg_command_scan_structure)
-            thread.start()
-            self.check_command_scan_structure(thread)
-
-    def check_command_export(self, thread):
-        if thread.is_alive():
-            self.after(1000, self.check_command_export, thread)
-            print('поток выполняется')
-        else:
-            print('поток завершён')
-            self.lib_storage.select_db(self.storage_db)
+            self.run_func_in_thread(self.fg_command_scan_structure, lambda: self.lib_storage.select_db(self.storage_db))
 
     def fg_command_export(self):
         self.lib_storage.select_db(self.storage_db)
@@ -114,9 +108,7 @@ class GUI(Tk):
 
     def command_export(self):
         if self.storage_structure:
-            thread = Thread(None, self.fg_command_export)
-            thread.start()
-            self.check_command_export(thread)
+            self.run_func_in_thread(self.fg_command_export, lambda: self.lib_storage.select_db(self.storage_db))
         else:
             print('Пожалуйста, выберите директорию структуры')
 
@@ -164,14 +156,6 @@ class GUI(Tk):
         self.val_storage_directory_copy.configure(text=self.storage_directory_copy)
         self.diff_file_path = '{}_diff.zip'.format(self.storage_directory_copy)
 
-    def check_command_generate_diff(self, thread):
-        if thread.is_alive():
-            self.after(1000, self.check_command_generate_diff, thread)
-            # print('поток выполняется')
-        else:
-            print('поток завершён')
-            self.lib_storage.select_db(self.storage_db)
-
     def fg_command_generate_diff(self):
         self.lib_storage.select_db(self.storage_db)
         self.lib_storage.scan_to_db(
@@ -186,9 +170,7 @@ class GUI(Tk):
             print('Пожалуйста, выберите директорию копии хранилища')
             return
 
-        thread = Thread(None, self.fg_command_generate_diff)
-        thread.start()
-        self.check_command_generate_diff(thread)
+        self.run_func_in_thread(self.fg_command_generate_diff, lambda: self.lib_storage.select_db(self.storage_db))
 
     def hide_btn_command_scan_directory(self):
         self.btn_command_load_structure.state(['active', '!disabled'])
@@ -282,7 +264,11 @@ class GUI(Tk):
         frame_input_actions = Frame(frame_input)
 
         frame_input_buttons = Frame(frame_input_actions)
-        self.btn_command_scan_directory = Button(frame_input_buttons, text='Сканировать директорию', command=self.command_scan)
+        self.btn_command_scan_directory = Button(
+            frame_input_buttons,
+            text='Сканировать директорию',
+            command=self.command_scan
+        )
         self.btn_command_scan_directory.pack(side=LEFT)
         # self.btn_command_load_structure = Button(frame_input_buttons, text='Загрузить структуру', command=None)
         # self.btn_command_load_structure.pack(side=LEFT)
@@ -353,7 +339,8 @@ class GUI(Tk):
         frame_input_copy.pack()
 
 
-with LibraryStorage(db_path='') as lib_storage:
-    gui = GUI(lib_storage)
-    gui.create_window()
-    gui.mainloop()
+if __name__ == '__main__':
+    with LibraryStorage(db_path='') as lib_storage:
+        gui = GUI(lib_storage)
+        gui.create_window()
+        gui.mainloop()
