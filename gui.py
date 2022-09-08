@@ -8,6 +8,7 @@ from library_storage import LibraryStorage
 
 
 def build_scrollable_frame(master):
+    """Источник: https://www.youtube.com/watch?v=0WafQCaok6g"""
     # Crrate a main Frame
     container = Frame(master)
     # Create a Canvas to the main frame
