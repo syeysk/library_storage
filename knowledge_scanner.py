@@ -31,13 +31,13 @@ RE_URLS = r'https?://[a-zA-Z0-9-_./%]+'
 re_urls = re.compile(RE_URLS)
 
 
-def process_file(text, print_url):
+def process_file(text, logger_action):
     urls = re_urls.findall(text)
     for url in urls:
-        print_url(url)
+        logger_action('found_url', {'url': url})
 
 
-def scan_knowlege(print_url):
+def scan_knowlege(logger_action):
     for dirpath, dirnames, filenames in os.walk(TEXT_PATH):
         if dirpath in IGNORE_PATHS:
             continue
@@ -47,15 +47,21 @@ def scan_knowlege(print_url):
             try:
                 # Проверяем расширене файла: оно обязано быть в .md
                 if not filename.endswith('.md'):
-                    print('Invalid files\'s extension:', filepath)
+                    logger_action('invalid_extension', {'filepath': filepath})
 
                 filepath = os.path.join(dirpath, filename)
                 with open(filepath, 'r', encoding='utf-8') as file:
-                    process_file(file.read(), print_url=print_url)
+                    process_file(file.read(), logger_action=logger_action)
             except Exception as error:
                 print(filepath)
                 raise error
 
 
 if __name__ == '__main__':
-    scan_knowlege(print_url=print)
+    def logger_action(name, data):
+        if name == 'invalid_extension':
+            print('Invalid files\'s extension:', data)
+        else:
+            print(name, data)
+
+    scan_knowlege(logger_action=logger_action)

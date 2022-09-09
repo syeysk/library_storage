@@ -13,10 +13,15 @@ class GUI(BasicGUI):
         BasicGUI.__init__(self)
 
     def scan_knowledge(self):
-        def print_url(url):
-            Label(self.frame_url, text=url).pack(anchor=W)
+        def logger_action(name, data):
+            if name == 'found_url':
+                Label(self.frame_url, text=data['url']).pack(anchor=W)
+            elif name == 'invalid_extension':
+                Label(self.frame_extension, text=data['filepath']).pack(anchor=W)
+            else:
+                print(name, data)
 
-        self.run_func_in_thread(lambda: scan_knowlege(print_url=print_url))
+        self.run_func_in_thread(lambda: scan_knowlege(logger_action=logger_action))
 
     def create_window(self):
         self.title('SYeysk Knowledge Scanner')
