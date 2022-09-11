@@ -17,7 +17,7 @@ class GUI(BasicGUI):
             def build_action_card(master2):
                 card_frame = Frame(master2, relief=GROOVE, borderwidth=2)
                 card_frame.pack(anchor=W, pady=5, padx=10, fill=X)
-                Label(card_frame, text=data['filepath'], background='gray').pack(anchor=W, fill=X)
+                Label(card_frame, text=data['relative_filepath'], background='gray').pack(anchor=W, fill=X)
                 return card_frame
 
             if name == 'found_url':

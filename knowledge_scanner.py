@@ -95,13 +95,12 @@ def scan_knowlege(logger_action):
 
         for filename in filenames:
             filepath = os.path.join(dirpath, filename)
-            action_data = {'filepath': filepath}
+            action_data = {'filepath': filepath, 'relative_filepath': filepath[len(TEXT_PATH)+1:]}
             try:
                 # Проверяем расширене файла: оно обязано быть в .md
                 if not filename.endswith('.md'):
                     logger_action('invalid_extension', action_data)
 
-                filepath = os.path.join(dirpath, filename)
                 with open(filepath, 'r', encoding='utf-8') as file:
                     process_content(file.read(), logger_action=logger_action, action_data=action_data)
             except Exception as error:
