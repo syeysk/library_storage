@@ -18,10 +18,17 @@
 Содержимое:
 - кодировка: utf-8
 - доступные протоколы URL: https://, http://
+
+Требования к этой программе:
+1. Независимо от того, какая некорректность допущена в заметке, обработка следующих заметок должна продолжаться.
+    Ошибки в заметках допустимы.
+2. Программа не должна изменять файлы заметок без ведома и согласия пользователя.
 """
 
 import os
 import re
+
+import yaml
 
 TEXT_PATH = 'D://Текст'
 IGNORE_PATHS = [f'{TEXT_PATH}/.obsidian', f'{TEXT_PATH}/.trash']
@@ -30,11 +37,55 @@ IGNORE_PATHS = [os.path.normpath(path) for path in IGNORE_PATHS]
 RE_URLS = r'https?://[a-zA-Z0-9-_./%]+'
 re_urls = re.compile(RE_URLS)
 
+ALLOWED_YAML_KEYS = {
+    'tags': 'Хэштеги',
+    'publicate_to': 'Публикация в сервисы',
+    'birth_date': 'День рождения'
+}
 
-def process_file(text, logger_action):
-    urls = re_urls.findall(text)
+
+def process_content(content, logger_action, action_data):
+    content = content.strip()
+
+    lines = content.split('\n')
+    is_yaml = lines and lines[0] == '---'
+    data_yaml = {}
+    if is_yaml:
+        yaml_length = 4
+        for line in lines[1:]:
+            if line == '---':
+                break
+
+            yaml_length += len(line) + 1
+
+        data_yaml = yaml.load(content[:yaml_length], yaml.SafeLoader)
+        content = content[yaml_length + 4:].rstrip()
+
+    for key in data_yaml:
+        if key not in ALLOWED_YAML_KEYS:
+            action_data['key'] = key
+            logger_action('unfound_yaml_key', action_data)
+
+    title = ''
+    if content.startswith('#'):
+        title, content = content.split('\n', 1)
+        content = content.rstrip()
+        title = title.lstrip('# ')
+
+    if not title:
+        logger_action('unfound_title', action_data)
+
+    publicate_to = data_yaml.get('publicate_to')
+    if publicate_to:
+        action_data['publicate_to'] = publicate_to
+        action_data['body'] = content
+        action_data['title'] = title
+        logger_action('publicate_to', action_data)
+
+    urls = re_urls.findall(content)
     for url in urls:
-        logger_action('found_url', {'url': url})
+        action_data['url'] = url
+        logger_action('found_url', action_data)
 
 
 def scan_knowlege(logger_action):
@@ -44,14 +95,15 @@ def scan_knowlege(logger_action):
 
         for filename in filenames:
             filepath = os.path.join(dirpath, filename)
+            action_data = {'filepath': filepath}
             try:
                 # Проверяем расширене файла: оно обязано быть в .md
                 if not filename.endswith('.md'):
-                    logger_action('invalid_extension', {'filepath': filepath})
+                    logger_action('invalid_extension', action_data)
 
                 filepath = os.path.join(dirpath, filename)
                 with open(filepath, 'r', encoding='utf-8') as file:
-                    process_file(file.read(), logger_action=logger_action)
+                    process_content(file.read(), logger_action=logger_action, action_data=action_data)
             except Exception as error:
                 print(filepath)
                 raise error
