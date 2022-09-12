@@ -5,12 +5,48 @@ from tkinter import (GROOVE, LEFT, RIGHT, TOP, Frame, LabelFrame, StringVar, Tk,
 from tkinter.ttk import Button, Label, Radiobutton, Separator, Notebook, Scrollbar
 
 from gui import BasicGUI, build_scrollable_frame
-from knowledge_scanner import scan_knowlege
+from knowledge_scanner import scan_knowlege, publicate_to
 
 
 class GUI(BasicGUI):
     def __init__(self):
         BasicGUI.__init__(self)
+
+    def publicate_to(self, service_name, lables):
+        request_data = publicate_to(service_name)
+        lables['id'].configure(text=request_data['id'])
+        lables['url'].configure(text=request_data['url'])
+        lables['publicate_datetime'].configure(text=request_data['publicate_datetime'])
+
+    def build_publication_subcard(self, service_name, card_frame):
+        service_frame = LabelFrame(card_frame, text=service_name)
+        service_frame.pack(anchor=W, fill=X)
+
+        frame_id = Frame(service_frame)
+        frame_id.pack(anchor=W)
+        Label(frame_id, text='ID:').pack(side=LEFT, anchor=W)
+        label_id = Label(frame_id)
+        label_id.pack(side=LEFT, anchor=W)
+
+        frame_url = Frame(service_frame)
+        frame_url.pack(anchor=W)
+        Label(frame_url, text='URL:').pack(side=LEFT, anchor=W)
+        label_url = Label(frame_url)
+        label_url.pack(side=LEFT, anchor=W)
+
+        frame_publicate_datetime = Frame(service_frame)
+        frame_publicate_datetime.pack(anchor=W)
+        Label(frame_publicate_datetime, text='Дата публикации:').pack(side=LEFT, anchor=W)
+        label_publicate_datetime = Label(frame_publicate_datetime)
+        label_publicate_datetime.pack(side=LEFT, anchor=W)
+
+        labels = {
+            'id': label_id,
+            'url': label_url,
+            'publicate_datetime': label_publicate_datetime,
+        }
+        command = lambda: self.publicate_to(service_name, labels)
+        Button(service_frame, text='Опубликовать', command=command).pack(anchor=SE)
 
     def scan_knowledge(self):
         def logger_action(name, data):
@@ -27,9 +63,7 @@ class GUI(BasicGUI):
                 card_frame = build_action_card(self.frame_publication)
                 Label(card_frame, text=data['title']).pack(anchor=W, fill=X)
                 for service_name, service_status in data['publicate_to'].items():
-                    service_frame = LabelFrame(card_frame, text=service_name)
-                    service_frame.pack(anchor=W, fill=X)
-                    Button(service_frame, text='Опубликовать').pack(anchor=SE)
+                    self.build_publication_subcard(service_name, card_frame)
             else:
                 card_frame = build_action_card(self.frame_other)
                 if name == 'invalid_extension':

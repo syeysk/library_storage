@@ -44,6 +44,15 @@ ALLOWED_YAML_KEYS = {
 }
 
 
+def publicate_to(service_name):
+    if service_name == 'syeysk':
+        return {'id': 3456, 'url': 'https://syeysk.ru/blog/3456', 'publicate_datetime': '2022-09-12 23:10'}
+    elif service_name == 'developsoc':
+        return {'id': 'article_name', 'url': 'https://developsoc.ru/article_name', 'publicate_datetime': '2022-09-12 23:10'}
+    elif service_name == 'knowledge':
+        return {'id': 'article_name', 'url': 'https://github.com/article_name', 'publicate_datetime': '2022-09-12 23:10'}
+
+
 def process_content(content, logger_action, action_data):
     content = content.strip()
 
