@@ -14,7 +14,7 @@ class GUI(BasicGUI):
 
     def publicate_to(self, service_name, lables):
         request_data = publicate_to(service_name)
-        lables['id'].configure(text=request_data['id'])
+        #lables['id'].configure(text=request_data['id'])
         lables['url'].configure(text=request_data['url'])
         lables['publicate_datetime'].configure(text=request_data['publicate_datetime'])
 
@@ -22,11 +22,11 @@ class GUI(BasicGUI):
         service_frame = LabelFrame(card_frame, text=service_name)
         service_frame.pack(anchor=W, fill=X)
 
-        frame_id = Frame(service_frame)
-        frame_id.pack(anchor=W)
-        Label(frame_id, text='ID:').pack(side=LEFT, anchor=W)
-        label_id = Label(frame_id)
-        label_id.pack(side=LEFT, anchor=W)
+        # frame_id = Frame(service_frame)
+        # frame_id.pack(anchor=W)
+        # Label(frame_id, text='ID:').pack(side=LEFT, anchor=W)
+        # label_id = Label(frame_id)
+        # label_id.pack(side=LEFT, anchor=W)
 
         frame_url = Frame(service_frame)
         frame_url.pack(anchor=W)
@@ -41,7 +41,7 @@ class GUI(BasicGUI):
         label_publicate_datetime.pack(side=LEFT, anchor=W)
 
         labels = {
-            'id': label_id,
+            #'id': label_id,
             'url': label_url,
             'publicate_datetime': label_publicate_datetime,
         }

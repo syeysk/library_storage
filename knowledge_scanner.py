@@ -24,7 +24,7 @@
     Ошибки в заметках допустимы.
 2. Программа не должна изменять файлы заметок без ведома и согласия пользователя.
 """
-
+import hashlib
 import os
 import re
 
@@ -42,6 +42,17 @@ ALLOWED_YAML_KEYS = {
     'publicate_to': 'Публикация в сервисы',
     'birth_date': 'День рождения'
 }
+
+
+def get_string_hash(string):
+    BLOCKSIZE = 65536
+    hasher = hashlib.blake2s()
+    bytes_of_string = string.encode('utf-8')
+    for start_position in range(0, len(bytes_of_string), BLOCKSIZE):
+        buf = bytes_of_string[start_position:start_position + BLOCKSIZE]
+        hasher.update(buf)
+
+    return hasher.hexdigest()
 
 
 def publicate_to(service_name):
@@ -89,6 +100,7 @@ def process_content(content, logger_action, action_data):
         action_data['publicate_to'] = publicate_to
         action_data['body'] = content
         action_data['title'] = title
+        action_data['current_hash'] = get_string_hash(content)
         logger_action('publicate_to', action_data)
 
     urls = re_urls.findall(content)
