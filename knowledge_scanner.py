@@ -55,7 +55,8 @@ def get_string_hash(string):
     return hasher.hexdigest()
 
 
-def publicate_to(service_name):
+def publicate_to(service_name, data):
+    service_data = data['publicate_to'][service_name]
     if service_name == 'syeysk':
         return {'id': 3456, 'url': 'https://syeysk.ru/blog/3456', 'publicate_datetime': '2022-09-12 23:10'}
     elif service_name == 'developsoc':
@@ -101,6 +102,14 @@ def process_content(content, logger_action, action_data):
         action_data['body'] = content
         action_data['title'] = title
         action_data['current_hash'] = get_string_hash(content)
+        print(action_data['current_hash'])
+        for service_name, service_data in publicate_to.items():
+            published_hash = service_data.get('published_hash')
+            if published_hash is None:
+                service_data['need_publicate'] = True
+            elif published_hash != action_data['current_hash']:
+                service_data['need_update'] = True
+
         logger_action('publicate_to', action_data)
 
     urls = re_urls.findall(content)
