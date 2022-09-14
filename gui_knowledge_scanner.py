@@ -12,13 +12,13 @@ class GUI(BasicGUI):
     def __init__(self):
         BasicGUI.__init__(self)
 
-    def publicate_to(self, service_name, lables):
-        request_data = publicate_to(service_name)
+    def publicate_to(self, service_name, lables, service_data):
+        request_data = publicate_to(service_name, service_data)
         #lables['id'].configure(text=request_data['id'])
         lables['url'].configure(text=request_data['url'])
         lables['publicate_datetime'].configure(text=request_data['publicate_datetime'])
 
-    def build_publication_subcard(self, service_name, card_frame):
+    def build_publication_subcard(self, service_name, card_frame, service_data):
         service_frame = LabelFrame(card_frame, text=service_name)
         service_frame.pack(anchor=W, fill=X)
 
@@ -45,7 +45,7 @@ class GUI(BasicGUI):
             'url': label_url,
             'publicate_datetime': label_publicate_datetime,
         }
-        command = lambda: self.publicate_to(service_name, labels)
+        command = lambda: self.publicate_to(service_name, labels, service_data)
         Button(service_frame, text='Опубликовать', command=command).pack(anchor=SE)
 
     def scan_knowledge(self):
@@ -62,8 +62,8 @@ class GUI(BasicGUI):
             elif name == 'publicate_to':
                 card_frame = build_action_card(self.frame_publication)
                 Label(card_frame, text=data['title']).pack(anchor=W, fill=X)
-                for service_name, service_status in data['publicate_to'].items():
-                    self.build_publication_subcard(service_name, card_frame)
+                for service_name, service_data in data['publicate_to'].items():
+                    self.build_publication_subcard(service_name, card_frame, service_data)
             else:
                 card_frame = build_action_card(self.frame_other)
                 if name == 'invalid_extension':
