@@ -24,24 +24,27 @@
     Ошибки в заметках допустимы.
 2. Программа не должна изменять файлы заметок без ведома и согласия пользователя.
 """
+import datetime
 import hashlib
 import os
 import re
 
+import requests
 import yaml
 
-TEXT_PATH = 'D://Текст'
-IGNORE_PATHS = [f'{TEXT_PATH}/.obsidian', f'{TEXT_PATH}/.trash']
-
-IGNORE_PATHS = [os.path.normpath(path) for path in IGNORE_PATHS]
-RE_URLS = r'https?://[a-zA-Z0-9-_./%]+'
-re_urls = re.compile(RE_URLS)
-
+DEFAULT_PASSWORD_FILEPATH = os.path.normpath('D://Пароли.kdbx')
+DEFAULT_NOTES_DIRPATH = os.path.normpath('D://Текст')
+IGNORE_PATHS = [
+    os.path.normpath(f'{DEFAULT_NOTES_DIRPATH}/.obsidian'),
+    os.path.normpath(f'{DEFAULT_NOTES_DIRPATH}/.trash'),
+]
+RE_URLS = re.compile(r'https?://[a-zA-Z0-9А-Яа-яёЁ_./%?=-]+')
 ALLOWED_YAML_KEYS = {
     'tags': 'Хэштеги',
     'publicate_to': 'Публикация в сервисы',
     'birth_date': 'День рождения'
 }
+DT_FORMAT = '%Y-%m-%d %H:%M:%S'
 
 
 def get_string_hash(string):
@@ -58,16 +61,35 @@ def get_string_hash(string):
 def publicate_to(service_name, data):
     service_data = data['publicate_to'][service_name]
     if service_name == 'syeysk':
-        return {'id': 3456, 'url': 'https://syeysk.ru/blog/3456', 'publicate_datetime': '2022-09-12 23:10'}
+        token = ''
+        headers = {'HTTP_AUTHORIZATION': f'Token {token}'}
+        url = 'https://syeysk.ru/api/blog/{method}'
+        if service_data.get('need_publicate'):
+            data = {'title': data['title'], 'content': data['body']}
+            response = requests.post(url.format(method='publicate'), data=data, headers=headers)
+            response_data = response.json()
+            if not response_data.get('success'):
+                return {'error': response_data['error']}
+
+            service_data['id'] = response_data['id']
+            service_data['url'] = response_data['url']
+            service_data['published_hash'] = data['current_hash']
+        elif service_data.get('need_update'):
+            data = {'id': service_data['id'], 'title': data['title'], 'content': data['body']}
+            response = requests.post(url.format(method='update'), data=data, headers=headers)
+
+        #return {'id': 3456, 'url': 'https://syeysk.ru/blog/3456', 'publicate_datetime': '2022-09-12 23:10'}
     elif service_name == 'developsoc':
         return {'id': 'article_name', 'url': 'https://developsoc.ru/article_name', 'publicate_datetime': '2022-09-12 23:10'}
     elif service_name == 'knowledge':
         return {'id': 'article_name', 'url': 'https://github.com/article_name', 'publicate_datetime': '2022-09-12 23:10'}
 
+    service_data['publicate_datetime'] = datetime.datetime.now().strftime(DT_FORMAT)
+    return service_data
+
 
 def process_content(content, logger_action, action_data):
     content = content.strip()
-
     lines = content.split('\n')
     is_yaml = lines and lines[0] == '---'
     data_yaml = {}
@@ -80,7 +102,7 @@ def process_content(content, logger_action, action_data):
             yaml_length += len(line) + 1
 
         data_yaml = yaml.load(content[:yaml_length], yaml.SafeLoader)
-        content = content[yaml_length + 4:].rstrip()
+        content = content[yaml_length + 4:].lstrip()
 
     for key in data_yaml:
         if key not in ALLOWED_YAML_KEYS:
@@ -88,10 +110,12 @@ def process_content(content, logger_action, action_data):
             logger_action('unfound_yaml_key', action_data)
 
     title = ''
-    if content.startswith('#'):
-        title, content = content.split('\n', 1)
-        content = content.rstrip()
-        title = title.lstrip('# ')
+    if content.startswith('# '):
+        parts = content.split('\n', 1)
+        title, content = parts if len(parts) == 2 else (parts[0], '')
+        content = content.lstrip()
+        title = title.lstrip('#')
+        title = title.strip()
 
     if not title:
         logger_action('unfound_title', action_data)
@@ -111,27 +135,27 @@ def process_content(content, logger_action, action_data):
 
         logger_action('publicate_to', action_data)
 
-    urls = re_urls.findall(content)
+    urls = RE_URLS.findall(content)
     for url in urls:
         action_data['url'] = url
         logger_action('found_url', action_data)
 
 
-def scan_knowlege(logger_action):
-    for dirpath, dirnames, filenames in os.walk(TEXT_PATH):
+def scan_knowlege(logger_action, notes_dirpath, password_filepath):
+    for dirpath, dirnames, filenames in os.walk(notes_dirpath):
         if dirpath in IGNORE_PATHS:
             continue
 
         for filename in filenames:
             filepath = os.path.join(dirpath, filename)
-            action_data = {'filepath': filepath, 'relative_filepath': filepath[len(TEXT_PATH)+1:]}
+            action_data = {'filepath': filepath, 'relative_filepath': filepath[len(notes_dirpath)+1:]}
             try:
                 # Проверяем расширене файла: оно обязано быть в .md
                 if not filename.endswith('.md'):
                     logger_action('invalid_extension', action_data)
 
                 with open(filepath, 'r', encoding='utf-8') as file:
-                    process_content(file.read(), logger_action=logger_action, action_data=action_data)
+                    process_content(file.read(), logger_action, action_data)
             except Exception as error:
                 print(filepath)
                 raise error
@@ -144,4 +168,4 @@ if __name__ == '__main__':
         else:
             print(name, data)
 
-    scan_knowlege(logger_action=logger_action)
+    scan_knowlege(logger_action, DEFAULT_NOTES_DIRPATH, DEFAULT_PASSWORD_FILEPATH)

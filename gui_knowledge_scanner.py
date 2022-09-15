@@ -5,18 +5,25 @@ from tkinter import (GROOVE, LEFT, RIGHT, TOP, Frame, LabelFrame, StringVar, Tk,
 from tkinter.ttk import Button, Label, Radiobutton, Separator, Notebook, Scrollbar
 
 from gui import BasicGUI, build_scrollable_frame
-from knowledge_scanner import scan_knowlege, publicate_to
+from knowledge_scanner import DEFAULT_PASSWORD_FILEPATH, DEFAULT_NOTES_DIRPATH, scan_knowlege, publicate_to
 
 
 class GUI(BasicGUI):
     def __init__(self):
         BasicGUI.__init__(self)
+        self.password_filepath = DEFAULT_PASSWORD_FILEPATH
+        self.notes_dirpath = DEFAULT_NOTES_DIRPATH
 
     def publicate_to(self, service_name, lables, data):
-        request_data = publicate_to(service_name, data)
-        #lables['id'].configure(text=request_data['id'])
-        lables['url'].configure(text=request_data['url'])
-        lables['publicate_datetime'].configure(text=request_data['publicate_datetime'])
+        service_data = publicate_to(service_name, data)
+        error = service_data.get('error')
+        if error:
+            print('Error:', error)
+        else:
+            #lables['id'].configure(text=service_data['id'])
+            lables['url'].configure(text=service_data['url'])
+
+        lables['publicate_datetime'].configure(text=service_data['publicate_datetime'])
 
     def build_publication_subcard(self, service_name, card_frame, data):
         service_data = data['publicate_to'][service_name]
@@ -83,10 +90,40 @@ class GUI(BasicGUI):
                 else:
                     print(name, data)
 
-        self.run_func_in_thread(lambda: scan_knowlege(logger_action=logger_action))
+        self.run_func_in_thread(lambda: scan_knowlege(logger_action, self.notes_dirpath, self.password_filepath))
+
+    def select_notes_dirpath(self):
+        notes_dirpath = filedialog.askdirectory(initialdir=self.notes_dirpath)
+        if not notes_dirpath:
+            return
+
+        self.notes_dirpath = notes_dirpath
+        self.label_storage.configure(text=self.notes_dirpath)
+
+    def select_password_filepath(self):
+        password_filepath = filedialog.askopenfile(initialdir=path.dirname(self.password_filepath))
+        if not password_filepath:
+            return
+
+        self.password_filepath = password_filepath
+        self.label_passwords.configure(text=self.password_filepath)
 
     def create_window(self):
         self.title('SYeysk Knowledge Scanner')
+
+        frame_storage = Frame(self)
+        Button(frame_storage, text='Изменить', command=self.select_notes_dirpath).pack(side=LEFT)
+        Label(frame_storage, text='Каталог заметок:').pack(side=LEFT)
+        self.label_storage = Label(frame_storage, text=self.notes_dirpath)
+        self.label_storage.pack(side=LEFT)
+        frame_storage.pack(fill=X)
+
+        frame_password = Frame(self)
+        Button(frame_password, text='Изменить', command=self.select_password_filepath).pack(side=LEFT)
+        Label(frame_password, text='Хранилище паролей:').pack(side=LEFT)
+        self.label_passwords = Label(frame_password, text=self.password_filepath)
+        self.label_passwords.pack(side=LEFT)
+        frame_password.pack(fill=X)
 
         frame_buttons = Frame(self)
         frame_buttons.pack(fill=X)
@@ -95,7 +132,7 @@ class GUI(BasicGUI):
             frame_buttons,
             text='Запустить сканирование',
             command=self.scan_knowledge
-        ).pack(side=LEFT)
+        ).pack(side=RIGHT)
 
         notebook = Notebook(self)
         notebook.pack(fill=BOTH, expand=1)
