@@ -29,6 +29,7 @@ import hashlib
 import os
 import re
 
+from pykeepass import PyKeePass
 import requests
 import yaml
 
@@ -58,34 +59,117 @@ def get_string_hash(string):
     return hasher.hexdigest()
 
 
-def publicate_to(service_name, data):
-    service_data = data['publicate_to'][service_name]
-    if service_name == 'syeysk':
+def get_password_data(service_name, group='main'):
+    pk = PyKeePass('db.kdbx', password='somePassw0rd')
+    pk.find()
+
+
+class ServiceSyeysk:
+    def __init__(self, title, body):
+        self.title = title
+        self.body = body
+        self.url = 'https://syeysk.ru/api/blog/{method}'
         token = ''
-        headers = {'HTTP_AUTHORIZATION': f'Token {token}'}
-        url = 'https://syeysk.ru/api/blog/{method}'
-        if service_data.get('need_publicate'):
-            data = {'title': data['title'], 'content': data['body']}
-            response = requests.post(url.format(method='publicate'), data=data, headers=headers)
-            response_data = response.json()
-            if not response_data.get('success'):
-                return {'error': response_data['error']}
+        self.headers = {'HTTP_AUTHORIZATION': f'Token {token}'}
 
-            service_data['id'] = response_data['id']
-            service_data['url'] = response_data['url']
-            service_data['published_hash'] = data['current_hash']
-        elif service_data.get('need_update'):
-            data = {'id': service_data['id'], 'title': data['title'], 'content': data['body']}
-            response = requests.post(url.format(method='update'), data=data, headers=headers)
+    def create_note(self):
+        data = {'title': self.title, 'content': self.body}
+        response = requests.post(self.url.format(method='publicate'), data=data, headers=self.headers)
+        response_data = response.json()
+        if not response_data.get('success'):
+            return {'error': response_data['error']}
 
-        #return {'id': 3456, 'url': 'https://syeysk.ru/blog/3456', 'publicate_datetime': '2022-09-12 23:10'}
-    elif service_name == 'developsoc':
+        return {'id': response_data['id'],'url': response_data['url']}
+
+    def update_note(self, note_id):
+        data = {'id': note_id, 'title': self.title, 'content': self.body}
+        response = requests.post(self.url.format(method='update'), data=data, headers=self.headers)
+        return {}
+
+
+class ServiceDevelopsoc:
+    def __init__(self, title, body):
+        pass
+
+    def create_note(self):
         return {'id': 'article_name', 'url': 'https://developsoc.ru/article_name', 'publicate_datetime': '2022-09-12 23:10'}
-    elif service_name == 'knowledge':
+
+    def update_note(self):
+        pass
+
+
+class ServiceKnowledge:
+    def __init__(self, title, body):
+        pass
+
+    def create_note(self):
         return {'id': 'article_name', 'url': 'https://github.com/article_name', 'publicate_datetime': '2022-09-12 23:10'}
 
-    service_data['publicate_datetime'] = datetime.datetime.now().strftime(DT_FORMAT)
-    return service_data
+    def update_note(self):
+        pass
+
+
+class Note:
+    """Класс, представлюящий заметку"""
+
+    def __init__(self, meta, title, body, filepath):
+        self.meta = meta
+        self.title = title
+        self.body = body
+        self.filepath = filepath
+        self.hash = get_string_hash('{}{}'.format(title, body))
+
+    def safe(self):
+        backup_filepath = 'backup_{}'.format(self.filepath)
+        with open(backup_filepath, 'w') as file_note:
+            yaml_str = yaml.dump(self.meta, explicity_srart=True, explicity_end=True)
+            file_note.write('{}\n\n'.format(yaml_str))
+            file_note.write('# {}\n\n'.format(self.title))
+            file_note.write('{}\n'.format(self.body))
+
+    def need_create_publication(self, service_name):
+        """
+        :param service_name: имя удалённого сервиса
+        :return: "create" - если нужно создать заметку на удалённом сервисе, "update" - если нужно обновить,
+         "nothing" - ничего не делать, так как заметка на удалённом сервисе находится в актуальном состоянии
+        """
+        publicate_to = self.meta.get('publicate_to')
+        if publicate_to and service_name in publicate_to:
+            service_data = publicate_to[service_name]
+            published_hash = service_data.get('published_hash')
+            if published_hash is None:
+                return 'create'
+
+            if published_hash != self.hash:
+                return 'update'
+
+        return 'nothing'
+
+    def publicate(self, service_name):
+        publicate_to = self.meta.get('publicate_to')
+        if publicate_to and service_name in publicate_to:
+            service_data = publicate_to[service_name]
+            if service_name == 'syeysk':
+                service = ServiceSyeysk(self.title, self.body)
+                #password_data = get_password_data(service_name)
+            elif service_name == 'developsoc':
+                service = ServiceDevelopsoc(self.title, self.body)
+            elif service_name == 'knowledge':
+                service = ServiceKnowledge(self.title, self.body)
+            else:
+                raise Exception('Unknown service: {}'.format(service_name))
+
+            if self.need_create_publication(service_name) == 'create':
+                response_data = service.create_note()
+            elif self.need_create_publication(service_name) == 'update':
+                response_data = service.update_note(service_data['id'])
+            else:
+                raise Exception('The note is already actual for service: {}'.format(service_name))
+
+            service_data.update(response_data)
+            service_data['published_hash'] = self.hash
+            service_data['publicate_datetime'] = datetime.datetime.now().strftime(DT_FORMAT)
+            return service_data
 
 
 def process_content(content, logger_action, action_data):
@@ -120,19 +204,10 @@ def process_content(content, logger_action, action_data):
     if not title:
         logger_action('unfound_title', action_data)
 
-    publicate_to = data_yaml.get('publicate_to')
-    if publicate_to:
-        action_data['publicate_to'] = publicate_to
-        action_data['body'] = content
-        action_data['title'] = title
-        action_data['current_hash'] = get_string_hash(content)
-        for service_name, service_data in publicate_to.items():
-            published_hash = service_data.get('published_hash')
-            if published_hash is None:
-                service_data['need_publicate'] = True
-            elif published_hash != action_data['current_hash']:
-                service_data['need_update'] = True
+    note = Note(data_yaml, title, content, action_data['filepath'])
 
+    if data_yaml.get('publicate_to'):
+        action_data['note'] = note
         logger_action('publicate_to', action_data)
 
     urls = RE_URLS.findall(content)

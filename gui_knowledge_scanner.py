@@ -5,7 +5,7 @@ from tkinter import (GROOVE, LEFT, RIGHT, TOP, Frame, LabelFrame, StringVar, Tk,
 from tkinter.ttk import Button, Label, Radiobutton, Separator, Notebook, Scrollbar
 
 from gui import BasicGUI, build_scrollable_frame
-from knowledge_scanner import DEFAULT_PASSWORD_FILEPATH, DEFAULT_NOTES_DIRPATH, scan_knowlege, publicate_to
+from knowledge_scanner import DEFAULT_PASSWORD_FILEPATH, DEFAULT_NOTES_DIRPATH, scan_knowlege
 
 
 class GUI(BasicGUI):
@@ -14,19 +14,18 @@ class GUI(BasicGUI):
         self.password_filepath = DEFAULT_PASSWORD_FILEPATH
         self.notes_dirpath = DEFAULT_NOTES_DIRPATH
 
-    def publicate_to(self, service_name, lables, data):
-        service_data = publicate_to(service_name, data)
+    def publicate_to(self, service_name, labels, note):
+        service_data = note.publicate(service_name)
         error = service_data.get('error')
         if error:
             print('Error:', error)
         else:
             #lables['id'].configure(text=service_data['id'])
-            lables['url'].configure(text=service_data['url'])
+            labels['url'].configure(text=service_data['url'])
+            labels['publicate_datetime'].configure(text=service_data['publicate_datetime'])
 
-        lables['publicate_datetime'].configure(text=service_data['publicate_datetime'])
-
-    def build_publication_subcard(self, service_name, card_frame, data):
-        service_data = data['publicate_to'][service_name]
+    def build_publication_subcard(self, service_name, card_frame, note):
+        service_data = note.meta['publicate_to'][service_name]
         service_frame = LabelFrame(card_frame, text=service_name)
         service_frame.pack(anchor=W, fill=X)
 
@@ -39,13 +38,13 @@ class GUI(BasicGUI):
         frame_url = Frame(service_frame)
         frame_url.pack(anchor=W)
         Label(frame_url, text='URL:').pack(side=LEFT, anchor=W)
-        label_url = Label(frame_url)
+        label_url = Label(frame_url, text=service_data.get('url', ''))
         label_url.pack(side=LEFT, anchor=W)
 
         frame_publicate_datetime = Frame(service_frame)
         frame_publicate_datetime.pack(anchor=W)
         Label(frame_publicate_datetime, text='Дата публикации:').pack(side=LEFT, anchor=W)
-        label_publicate_datetime = Label(frame_publicate_datetime)
+        label_publicate_datetime = Label(frame_publicate_datetime, text=service_data.get('publicate_datetime', ''))
         label_publicate_datetime.pack(side=LEFT, anchor=W)
 
         labels = {
@@ -53,15 +52,18 @@ class GUI(BasicGUI):
             'url': label_url,
             'publicate_datetime': label_publicate_datetime,
         }
-        command = lambda: self.publicate_to(service_name, labels, data)
+        command = lambda: self.publicate_to(service_name, labels, note)
         text_of_button = None
-        if service_data.get('need_publicate'):
+        if note.need_create_publication(service_name) == 'create':
             text_of_button = 'Опубликовать'
-        elif service_data.get('need_update'):
+        elif note.need_create_publication(service_name) == 'update':
             text_of_button = 'Обновить'
 
         if text_of_button:
-            Button(service_frame, text=text_of_button, command=command).pack(anchor=SE)
+            frame_buttons = Frame(service_frame)
+            frame_buttons.pack(fill=X)
+            Button(frame_buttons, text='Сохранить').pack(side=RIGHT, anchor=SE)
+            Button(frame_buttons, text=text_of_button, command=command).pack(side=RIGHT, anchor=SE)
 
     def scan_knowledge(self):
         def logger_action(name, data):
@@ -76,9 +78,10 @@ class GUI(BasicGUI):
                 Label(card_frame, text=data['url']).pack(anchor=W)
             elif name == 'publicate_to':
                 card_frame = build_action_card(self.frame_publication)
-                Label(card_frame, text=data['title']).pack(anchor=W, fill=X)
-                for service_name, service_data in data['publicate_to'].items():
-                    self.build_publication_subcard(service_name, card_frame, data)
+                note = data['note']
+                Label(card_frame, text=note.title).pack(anchor=W, fill=X)
+                for service_name, service_data in note.meta['publicate_to'].items():
+                    self.build_publication_subcard(service_name, card_frame, note)
             else:
                 card_frame = build_action_card(self.frame_other)
                 if name == 'invalid_extension':
