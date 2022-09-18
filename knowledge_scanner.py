@@ -79,7 +79,7 @@ class ServiceSyeysk:
         if not response_data.get('success'):
             return {'error': response_data['error']}
 
-        return {'id': response_data['id'],'url': response_data['url']}
+        return {'id': response_data['id'], 'url': response_data['url']}
 
     def update_note(self, note_id):
         data = {'id': note_id, 'title': self.title, 'content': self.body}
@@ -94,8 +94,8 @@ class ServiceDevelopsoc:
     def create_note(self):
         return {'id': 'article_name', 'url': 'https://developsoc.ru/article_name', 'publicate_datetime': '2022-09-12 23:10'}
 
-    def update_note(self):
-        pass
+    def update_note(self, note_id):
+        return {}
 
 
 class ServiceKnowledge:
@@ -105,8 +105,8 @@ class ServiceKnowledge:
     def create_note(self):
         return {'id': 'article_name', 'url': 'https://github.com/article_name', 'publicate_datetime': '2022-09-12 23:10'}
 
-    def update_note(self):
-        pass
+    def update_note(self, note_id):
+        return {}
 
 
 class Note:
@@ -118,12 +118,22 @@ class Note:
         self.body = body
         self.filepath = filepath
         self.hash = get_string_hash('{}{}'.format(title, body))
+        self.custom = {}
 
-    def safe(self):
-        backup_filepath = 'backup_{}'.format(self.filepath)
-        with open(backup_filepath, 'w') as file_note:
-            yaml_str = yaml.dump(self.meta, explicity_srart=True, explicity_end=True)
-            file_note.write('{}\n\n'.format(yaml_str))
+    def save(self):
+        backup_filepath = '{}.backup'.format(self.filepath)
+        with open(backup_filepath, 'w', encoding='utf-8') as file_note:
+            yaml_str = yaml.dump(
+                self.meta,
+                Dumper=yaml.SafeDumper,
+                explicit_start=True,
+                explicit_end=False,
+                sort_keys=False,
+                allow_unicode=True,
+                indent=4,
+                width=70,
+            )
+            file_note.write('{}\n---\n\n'.format(yaml_str))
             file_note.write('# {}\n\n'.format(self.title))
             file_note.write('{}\n'.format(self.body))
 
@@ -204,9 +214,8 @@ def process_content(content, logger_action, action_data):
     if not title:
         logger_action('unfound_title', action_data)
 
-    note = Note(data_yaml, title, content, action_data['filepath'])
-
     if data_yaml.get('publicate_to'):
+        note = Note(data_yaml, title, content, action_data['filepath'])
         action_data['note'] = note
         logger_action('publicate_to', action_data)
 

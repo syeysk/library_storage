@@ -14,15 +14,23 @@ class GUI(BasicGUI):
         self.password_filepath = DEFAULT_PASSWORD_FILEPATH
         self.notes_dirpath = DEFAULT_NOTES_DIRPATH
 
-    def publicate_to(self, service_name, labels, note):
+    def save(self, service_name, note):
+        note.save()
+        custom_data = note.custom[service_name]
+        custom_data['button_save'].state(['!active', 'disabled'])
+
+    def publicate_to(self, service_name, note):
+        custom_data = note.custom[service_name]
         service_data = note.publicate(service_name)
         error = service_data.get('error')
         if error:
             print('Error:', error)
         else:
             #lables['id'].configure(text=service_data['id'])
-            labels['url'].configure(text=service_data['url'])
-            labels['publicate_datetime'].configure(text=service_data['publicate_datetime'])
+            custom_data['label_url'].configure(text=service_data['url'])
+            custom_data['label_publicate_datetime'].configure(text=service_data['publicate_datetime'])
+            custom_data['button_save'].state(['active', '!disabled'])
+            custom_data['button_publicate'].state(['!active', 'disabled'])
 
     def build_publication_subcard(self, service_name, card_frame, note):
         service_data = note.meta['publicate_to'][service_name]
@@ -47,12 +55,9 @@ class GUI(BasicGUI):
         label_publicate_datetime = Label(frame_publicate_datetime, text=service_data.get('publicate_datetime', ''))
         label_publicate_datetime.pack(side=LEFT, anchor=W)
 
-        labels = {
-            #'id': label_id,
-            'url': label_url,
-            'publicate_datetime': label_publicate_datetime,
-        }
-        command = lambda: self.publicate_to(service_name, labels, note)
+        custom_data = note.custom.setdefault(service_name, {})
+        custom_data['label_url'] = label_url
+        custom_data['label_publicate_datetime'] = label_publicate_datetime
         text_of_button = None
         if note.need_create_publication(service_name) == 'create':
             text_of_button = 'Опубликовать'
@@ -62,8 +67,20 @@ class GUI(BasicGUI):
         if text_of_button:
             frame_buttons = Frame(service_frame)
             frame_buttons.pack(fill=X)
-            Button(frame_buttons, text='Сохранить').pack(side=RIGHT, anchor=SE)
-            Button(frame_buttons, text=text_of_button, command=command).pack(side=RIGHT, anchor=SE)
+
+            # TODO: кнопка должна сохранять данные только конкретного сервиса, храня его отдельно и при сохранении добавляя к обще метаинформации
+            button_save = Button(frame_buttons, text='Сохранить', command=lambda: self.save(service_name, note))
+            button_save.pack(side=RIGHT, anchor=SE)
+            button_save.state(['!active', 'disabled'])
+            custom_data['button_save'] = button_save
+
+            button_publicate = Button(
+                frame_buttons,
+                text=text_of_button,
+                command=lambda: self.publicate_to(service_name, note)
+            )
+            button_publicate.pack(side=RIGHT, anchor=SE)
+            custom_data['button_publicate'] = button_publicate
 
     def scan_knowledge(self):
         def logger_action(name, data):
