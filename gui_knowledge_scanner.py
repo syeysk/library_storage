@@ -23,7 +23,7 @@ class GUI(BasicGUI):
 
     def publicate_to(self, service_name, note):
         custom_data = note.custom[service_name]
-        service_data = note.publicate(service_name)
+        service_data = note.publicate(service_name, self.password_filepath, self.password)
         error = service_data.get('error')
         if error:
             print('Error:', error)
@@ -112,7 +112,7 @@ class GUI(BasicGUI):
                 else:
                     print(name, data)
 
-        self.run_func_in_thread(lambda: scan_knowlege(logger_action, self.notes_dirpath, self.password_filepath))
+        self.run_func_in_thread(lambda: scan_knowlege(logger_action, self.notes_dirpath))
 
     def select_notes_dirpath(self):
         notes_dirpath = filedialog.askdirectory(initialdir=self.notes_dirpath)
@@ -139,7 +139,9 @@ class GUI(BasicGUI):
         frame_field = Frame(window)
         frame_field.pack(fill=X)
         Label(frame_field, text='Пароль:').pack(side=LEFT)
-        Entry(frame_field, textvariable=self.var_password).pack(side=LEFT)
+        entry_password = Entry(frame_field, textvariable=self.var_password)
+        entry_password.pack(side=LEFT)
+        entry_password.focus()
 
         frame_button = Frame(window)
         frame_button.pack(fill=X)

@@ -42,8 +42,9 @@ IGNORE_PATHS = [
 RE_URLS = re.compile(r'https?://[a-zA-Z0-9А-Яа-яёЁ_./%?=-]+')
 ALLOWED_YAML_KEYS = {
     'tags': 'Хэштеги',
-    'publicate_to': 'Публикация в сервисы',
-    'birth_date': 'День рождения'
+    'publicate_to': 'В какие сервисы публиковать',
+    'birth_date': 'Дата рождения',
+    'death_date': 'Дата смерти',
 }
 DT_FORMAT = '%Y-%m-%d %H:%M:%S'
 
@@ -59,8 +60,14 @@ def get_string_hash(string):
     return hasher.hexdigest()
 
 
-def get_password_data(service_name, group='main', app_name=True, password_filepath=DEFAULT_PASSWORD_FILEPATH):
-    pk = PyKeePass(password_filepath, password='')
+def get_password_data(
+    service_name,
+    group='main',
+    app_name=True,
+    password_filepath=DEFAULT_PASSWORD_FILEPATH,
+    password='',
+):
+    pk = PyKeePass(password_filepath, password=password)
     title = f'{service_name}_{group}' if group else service_name
     if app_name:
         title = f'storage_scanner_{title}'
@@ -72,13 +79,19 @@ def get_password_data(service_name, group='main', app_name=True, password_filepa
 class BaseService:
     SERVICE_NAME = None
 
-    def __init__(self, title, body, password_filepath=DEFAULT_PASSWORD_FILEPATH):
+    def __init__(self, title, body, password_filepath=DEFAULT_PASSWORD_FILEPATH, password=''):
         self.title = title
         self.body = body
         self._password_filepath = password_filepath
+        self._password = password
 
     def get_password_data(self, group='main'):
-        return get_password_data(self.SERVICE_NAME, group=group, password_filepath=self._password_filepath)
+        return get_password_data(
+            self.SERVICE_NAME,
+            group=group,
+            password_filepath=self._password_filepath,
+            password=self._password,
+        )
 
 
 class SyeyskService(BaseService):
@@ -114,6 +127,7 @@ class DevelopsocService(BaseService):
         super(DevelopsocService, self).__init__(**kwargs)
 
     def create_note(self):
+        print('----', self._password)
         return {'id': 'article_name', 'url': 'https://developsoc.ru/article_name', 'publicate_datetime': '2022-09-12 23:10'}
 
     def update_note(self, note_id):
@@ -130,20 +144,20 @@ class KnowledgeService(BaseService):
         return {'id': 'article_name', 'url': 'https://github.com/article_name', 'publicate_datetime': '2022-09-12 23:10'}
 
     def update_note(self, note_id):
+        print('----', self._password)
         return {}
 
 
 class Note:
     """Класс, представлюящий заметку"""
 
-    def __init__(self, meta, title, body, filepath, password_filepath=DEFAULT_PASSWORD_FILEPATH):
+    def __init__(self, meta, title, body, filepath):
         self.meta = meta
         self.title = title
         self.body = body
         self.filepath = filepath
         self.hash = get_string_hash('{}{}'.format(title, body))
         self.custom = {}
-        self.password_filepath = password_filepath
 
     def save(self):
         backup_filepath = '{}.backup'.format(self.filepath)
@@ -180,20 +194,31 @@ class Note:
 
         return 'nothing'
 
-    def publicate(self, service_name):
+    def publicate(self, service_name, password_filepath=DEFAULT_PASSWORD_FILEPATH, password=''):
         publicate_to = self.meta.get('publicate_to')
         if publicate_to and service_name in publicate_to:
             service_data = publicate_to[service_name]
             if service_name == 'syeysk':
-                service = SyeyskService(title=self.title, body=self.body, password_filepath=self.password_filepath)
+                service = SyeyskService(
+                    title=self.title,
+                    body=self.body,
+                    password_filepath=password_filepath,
+                    password=password
+                )
             elif service_name == 'developsoc':
                 service = DevelopsocService(
                     title=self.title,
                     body=self.body,
-                    password_filepath=self.password_filepath
+                    password_filepath=password_filepath,
+                    password=password,
                 )
             elif service_name == 'knowledge':
-                service = KnowledgeService(title=self.title, body=self.body, password_filepath=self.password_filepath)
+                service = KnowledgeService(
+                    title=self.title,
+                    body=self.body,
+                    password_filepath=password_filepath,
+                    password=password,
+                )
             else:
                 raise Exception('Unknown service: {}'.format(service_name))
 
@@ -210,7 +235,7 @@ class Note:
             return service_data
 
 
-def process_content(content, logger_action, action_data, password_filepath=DEFAULT_PASSWORD_FILEPATH):
+def process_content(content, logger_action, action_data):
     content = content.strip()
     lines = content.split('\n')
     is_yaml = lines and lines[0] == '---'
@@ -243,7 +268,7 @@ def process_content(content, logger_action, action_data, password_filepath=DEFAU
         logger_action('unfound_title', action_data)
 
     if data_yaml.get('publicate_to'):
-        note = Note(data_yaml, title, content, action_data['filepath'], password_filepath=password_filepath)
+        note = Note(data_yaml, title, content, action_data['filepath'])
         action_data['note'] = note
         logger_action('publicate_to', action_data)
 
@@ -253,7 +278,7 @@ def process_content(content, logger_action, action_data, password_filepath=DEFAU
         logger_action('found_url', action_data)
 
 
-def scan_knowlege(logger_action, notes_dirpath, password_filepath=DEFAULT_PASSWORD_FILEPATH):
+def scan_knowlege(logger_action, notes_dirpath):
     for dirpath, dirnames, filenames in os.walk(notes_dirpath):
         if dirpath in IGNORE_PATHS:
             continue
@@ -267,7 +292,7 @@ def scan_knowlege(logger_action, notes_dirpath, password_filepath=DEFAULT_PASSWO
                     logger_action('invalid_extension', action_data)
 
                 with open(filepath, 'r', encoding='utf-8') as file:
-                    process_content(file.read(), logger_action, action_data, password_filepath)
+                    process_content(file.read(), logger_action, action_data)
             except Exception as error:
                 print(filepath)
                 raise error
@@ -280,4 +305,4 @@ if __name__ == '__main__':
         else:
             print(name, data)
 
-    scan_knowlege(logger_action, DEFAULT_NOTES_DIRPATH, DEFAULT_PASSWORD_FILEPATH)
+    scan_knowlege(logger_action, DEFAULT_NOTES_DIRPATH)
