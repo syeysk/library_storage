@@ -59,18 +59,38 @@ def get_string_hash(string):
     return hasher.hexdigest()
 
 
-def get_password_data(service_name, group='main'):
-    pk = PyKeePass('db.kdbx', password='somePassw0rd')
-    pk.find()
+def get_password_data(service_name, group='main', app_name=True, password_filepath=DEFAULT_PASSWORD_FILEPATH):
+    pk = PyKeePass(password_filepath, password='')
+    title = f'{service_name}_{group}' if group else service_name
+    if app_name:
+        title = f'storage_scanner_{title}'
+    password_data = pk.find_entries(title=title, first=True)
+    print(password_data, dir(password_data))
+    return password_data
 
 
-class ServiceSyeysk:
-    def __init__(self, title, body):
+class BaseService:
+    SERVICE_NAME = None
+
+    def __init__(self, title, body, password_filepath=DEFAULT_PASSWORD_FILEPATH):
         self.title = title
         self.body = body
+        self._password_filepath = password_filepath
+
+    def get_password_data(self, group='main'):
+        return get_password_data(self.SERVICE_NAME, group=group, password_filepath=self._password_filepath)
+
+
+class SyeyskService(BaseService):
+    SERVICE_NAME = 'syeysk'
+
+    def __init__(self, **kwargs):
+        super(SyeyskService, self).__init__(**kwargs)
+
         self.url = 'https://syeysk.ru/api/blog/{method}'
-        token = ''
-        self.headers = {'HTTP_AUTHORIZATION': f'Token {token}'}
+        password_data = self.get_password_data()
+        self.token = password_data.password
+        self.headers = {'HTTP_AUTHORIZATION': f'Token {self.token}'}
 
     def create_note(self):
         data = {'title': self.title, 'content': self.body}
@@ -87,9 +107,11 @@ class ServiceSyeysk:
         return {}
 
 
-class ServiceDevelopsoc:
-    def __init__(self, title, body):
-        pass
+class DevelopsocService(BaseService):
+    SERVICE_NAME = 'Developsoc'
+
+    def __init__(self, **kwargs):
+        super(DevelopsocService, self).__init__(**kwargs)
 
     def create_note(self):
         return {'id': 'article_name', 'url': 'https://developsoc.ru/article_name', 'publicate_datetime': '2022-09-12 23:10'}
@@ -98,9 +120,11 @@ class ServiceDevelopsoc:
         return {}
 
 
-class ServiceKnowledge:
-    def __init__(self, title, body):
-        pass
+class KnowledgeService(BaseService):
+    SERVICE_NAME = 'knowledge'
+
+    def __init__(self, **kwargs):
+        super(KnowledgeService, self).__init__(**kwargs)
 
     def create_note(self):
         return {'id': 'article_name', 'url': 'https://github.com/article_name', 'publicate_datetime': '2022-09-12 23:10'}
@@ -112,13 +136,14 @@ class ServiceKnowledge:
 class Note:
     """Класс, представлюящий заметку"""
 
-    def __init__(self, meta, title, body, filepath):
+    def __init__(self, meta, title, body, filepath, password_filepath=DEFAULT_PASSWORD_FILEPATH):
         self.meta = meta
         self.title = title
         self.body = body
         self.filepath = filepath
         self.hash = get_string_hash('{}{}'.format(title, body))
         self.custom = {}
+        self.password_filepath = password_filepath
 
     def save(self):
         backup_filepath = '{}.backup'.format(self.filepath)
@@ -160,12 +185,15 @@ class Note:
         if publicate_to and service_name in publicate_to:
             service_data = publicate_to[service_name]
             if service_name == 'syeysk':
-                service = ServiceSyeysk(self.title, self.body)
-                #password_data = get_password_data(service_name)
+                service = SyeyskService(title=self.title, body=self.body, password_filepath=self.password_filepath)
             elif service_name == 'developsoc':
-                service = ServiceDevelopsoc(self.title, self.body)
+                service = DevelopsocService(
+                    title=self.title,
+                    body=self.body,
+                    password_filepath=self.password_filepath
+                )
             elif service_name == 'knowledge':
-                service = ServiceKnowledge(self.title, self.body)
+                service = KnowledgeService(title=self.title, body=self.body, password_filepath=self.password_filepath)
             else:
                 raise Exception('Unknown service: {}'.format(service_name))
 
@@ -182,7 +210,7 @@ class Note:
             return service_data
 
 
-def process_content(content, logger_action, action_data):
+def process_content(content, logger_action, action_data, password_filepath=DEFAULT_PASSWORD_FILEPATH):
     content = content.strip()
     lines = content.split('\n')
     is_yaml = lines and lines[0] == '---'
@@ -215,7 +243,7 @@ def process_content(content, logger_action, action_data):
         logger_action('unfound_title', action_data)
 
     if data_yaml.get('publicate_to'):
-        note = Note(data_yaml, title, content, action_data['filepath'])
+        note = Note(data_yaml, title, content, action_data['filepath'], password_filepath=password_filepath)
         action_data['note'] = note
         logger_action('publicate_to', action_data)
 
@@ -225,7 +253,7 @@ def process_content(content, logger_action, action_data):
         logger_action('found_url', action_data)
 
 
-def scan_knowlege(logger_action, notes_dirpath, password_filepath):
+def scan_knowlege(logger_action, notes_dirpath, password_filepath=DEFAULT_PASSWORD_FILEPATH):
     for dirpath, dirnames, filenames in os.walk(notes_dirpath):
         if dirpath in IGNORE_PATHS:
             continue
@@ -239,7 +267,7 @@ def scan_knowlege(logger_action, notes_dirpath, password_filepath):
                     logger_action('invalid_extension', action_data)
 
                 with open(filepath, 'r', encoding='utf-8') as file:
-                    process_content(file.read(), logger_action, action_data)
+                    process_content(file.read(), logger_action, action_data, password_filepath)
             except Exception as error:
                 print(filepath)
                 raise error
