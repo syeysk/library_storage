@@ -1,7 +1,7 @@
 from os import curdir, path, makedirs
 from threading import Thread
 from tkinter import (GROOVE, LEFT, RIGHT, TOP, Frame, LabelFrame, StringVar, Tk, W, SE, filedialog, Toplevel, VERTICAL,
-    Canvas, Y, ALL, BOTH, NW, X)
+    Canvas, Y, ALL, BOTH, NW, X, Entry, Text)
 from tkinter.ttk import Button, Label, Radiobutton, Separator, Notebook, Scrollbar
 
 from gui import BasicGUI, build_scrollable_frame
@@ -13,6 +13,8 @@ class GUI(BasicGUI):
         BasicGUI.__init__(self)
         self.password_filepath = DEFAULT_PASSWORD_FILEPATH
         self.notes_dirpath = DEFAULT_NOTES_DIRPATH
+        self.password = None
+        self.var_password = StringVar(value='')
 
     def save(self, service_name, note):
         note.save()
@@ -128,6 +130,21 @@ class GUI(BasicGUI):
         self.password_filepath = password_filepath
         self.label_passwords.configure(text=self.password_filepath)
 
+    def window_set_password(self):
+        def set_password():
+            self.password = self.var_password.get()
+            window.destroy()
+
+        window = Toplevel(self)
+        frame_field = Frame(window)
+        frame_field.pack(fill=X)
+        Label(frame_field, text='Пароль:').pack(side=LEFT)
+        Entry(frame_field, textvariable=self.var_password).pack(side=LEFT)
+
+        frame_button = Frame(window)
+        frame_button.pack(fill=X)
+        Button(frame_button, text='Сохранить', command=set_password).pack(side=LEFT)
+
     def create_window(self):
         self.title('SYeysk Knowledge Scanner')
 
@@ -140,6 +157,7 @@ class GUI(BasicGUI):
 
         frame_password = Frame(self)
         Button(frame_password, text='Изменить', command=self.select_password_filepath).pack(side=LEFT)
+        Button(frame_password, text='Пароль', command=self.window_set_password).pack(side=LEFT)
         Label(frame_password, text='Хранилище паролей:').pack(side=LEFT)
         self.label_passwords = Label(frame_password, text=self.password_filepath)
         self.label_passwords.pack(side=LEFT)
