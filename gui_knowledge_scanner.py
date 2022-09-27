@@ -123,12 +123,12 @@ class GUI(BasicGUI):
         self.label_storage.configure(text=self.notes_dirpath)
 
     def select_password_filepath(self):
-        password_filepath = filedialog.askopenfile(initialdir=path.dirname(self.password_filepath))
+        password_filepath = filedialog.askopenfilename(initialdir=path.dirname(self.password_filepath))
         if not password_filepath:
             return
 
         self.password_filepath = password_filepath
-        self.label_passwords.configure(text=self.password_filepath)
+        self.label_passwords.configure(text=password_filepath)
 
     def window_set_password(self):
         def set_password():

@@ -30,6 +30,7 @@ import os
 import re
 
 from pykeepass import PyKeePass
+from pykeepass.exceptions import CredentialsError
 import requests
 import yaml
 
@@ -67,12 +68,16 @@ def get_password_data(
     password_filepath=DEFAULT_PASSWORD_FILEPATH,
     password='',
 ):
-    pk = PyKeePass(password_filepath, password=password)
+    try:
+        pk = PyKeePass(password_filepath, password=password)
+    except CredentialsError as error:
+        print('Invalid password:', error)
+        raise from error
+
     title = f'{service_name}_{group}' if group else service_name
     if app_name:
         title = f'storage_scanner_{title}'
     password_data = pk.find_entries(title=title, first=True)
-    print(password_data, dir(password_data))
     return password_data
 
 
@@ -100,14 +105,16 @@ class SyeyskService(BaseService):
     def __init__(self, **kwargs):
         super(SyeyskService, self).__init__(**kwargs)
 
-        self.url = 'https://syeysk.ru/api/blog/{method}'
+        self.url = 'https://syeysk.ru/api/blog/{method}/'
         password_data = self.get_password_data()
         self.token = password_data.password
         self.headers = {'HTTP_AUTHORIZATION': f'Token {self.token}'}
 
     def create_note(self):
-        data = {'title': self.title, 'content': self.body}
-        response = requests.post(self.url.format(method='publicate'), data=data, headers=self.headers)
+        cut = self.body.split('\n', 1)[0]
+        data = {'title': self.title, 'content': self.body, 'cut': cut}
+        response = requests.post(self.url.format(method='create_article'), json=data, headers=self.headers)
+        print('-----', response.text)
         response_data = response.json()
         if not response_data.get('success'):
             return {'error': response_data['error']}
@@ -116,7 +123,7 @@ class SyeyskService(BaseService):
 
     def update_note(self, note_id):
         data = {'id': note_id, 'title': self.title, 'content': self.body}
-        response = requests.post(self.url.format(method='update'), data=data, headers=self.headers)
+        response = requests.post(self.url.format(method='update_article'), json=data, headers=self.headers)
         return {}
 
 
