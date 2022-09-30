@@ -28,6 +28,8 @@ import datetime
 import hashlib
 import os
 import re
+import shutil
+import time
 
 from pykeepass import PyKeePass
 from pykeepass.exceptions import CredentialsError
@@ -72,7 +74,7 @@ def get_password_data(
         pk = PyKeePass(password_filepath, password=password)
     except CredentialsError as error:
         print('Invalid password:', error)
-        raise from error
+        raise Exception from error
 
     title = f'{service_name}_{group}' if group else service_name
     if app_name:
@@ -110,21 +112,27 @@ class SyeyskService(BaseService):
         self.token = password_data.password
         self.headers = {'HTTP_AUTHORIZATION': f'Token {self.token}'}
 
-    def create_note(self):
-        cut = self.body.split('\n', 1)[0]
-        data = {'title': self.title, 'content': self.body, 'cut': cut}
-        response = requests.post(self.url.format(method='create_article'), json=data, headers=self.headers)
-        print('-----', response.text)
-        response_data = response.json()
-        if not response_data.get('success'):
-            return {'error': response_data['error']}
+        parts = self.body.split('\n', 1)
+        self.cut = parts[0] if parts else ''
+        self.body = parts[1] if len(parts) > 1else self.cut
 
-        return {'id': response_data['id'], 'url': response_data['url']}
+    def create_note(self):
+        data = {'title': self.title, 'content': self.body, 'cut': self.cut}
+        response = requests.post(self.url.format(method='create_article'), json=data, headers=self.headers)
+        if response.status_code == 200:
+            response_data = response.json()
+            return True, {'id': response_data['id'], 'url': response_data['url']}
+
+        return False, response.text
 
     def update_note(self, note_id):
-        data = {'id': note_id, 'title': self.title, 'content': self.body}
+        data = {'article_id': note_id, 'title': self.title, 'content': self.body, 'cut': self.cut}
         response = requests.post(self.url.format(method='update_article'), json=data, headers=self.headers)
-        return {}
+        if response.status_code == 200:
+            response_data = response.json()
+            return True, {'url': response_data['url']}
+
+        return False, response.text
 
 
 class DevelopsocService(BaseService):
@@ -167,21 +175,29 @@ class Note:
         self.custom = {}
 
     def save(self):
-        backup_filepath = '{}.backup'.format(self.filepath)
-        with open(backup_filepath, 'w', encoding='utf-8') as file_note:
-            yaml_str = yaml.dump(
-                self.meta,
-                Dumper=yaml.SafeDumper,
-                explicit_start=True,
-                explicit_end=False,
-                sort_keys=False,
-                allow_unicode=True,
-                indent=4,
-                width=70,
-            )
-            file_note.write('{}\n---\n\n'.format(yaml_str[:-2]))
-            file_note.write('# {}\n\n'.format(self.title))
-            file_note.write('{}\n'.format(self.body))
+        filepath_copy = os.path.join(
+            os.path.dirname(self.filepath),
+            '.trash',
+            '{}.{}'.format(os.path.basename(self.filepath), time.time_ns()),
+        )
+        shutil.copy(self.filepath, filepath_copy)
+        try:
+            with open(self.filepath, 'w', encoding='utf-8') as file_note:
+                yaml_str = yaml.dump(
+                    self.meta,
+                    Dumper=yaml.SafeDumper,
+                    explicit_start=True,
+                    explicit_end=False,
+                    sort_keys=False,
+                    allow_unicode=True,
+                    indent=4,
+                    width=70,
+                )
+                file_note.write('{}\n---\n\n'.format(yaml_str[:-2]))
+                file_note.write('# {}\n\n'.format(self.title))
+                file_note.write('{}\n'.format(self.body))
+        except Exception as error:
+            print('Error of saving note. Copy of original is here:', filepath_copy)
 
     def need_create_publication(self, service_name):
         """
@@ -230,16 +246,19 @@ class Note:
                 raise Exception('Unknown service: {}'.format(service_name))
 
             if self.need_create_publication(service_name) == 'create':
-                response_data = service.create_note()
+                is_success, response_data = service.create_note()
             elif self.need_create_publication(service_name) == 'update':
-                response_data = service.update_note(service_data['id'])
+                is_success, response_data = service.update_note(service_data['id'])
             else:
                 raise Exception('The note is already actual for service: {}'.format(service_name))
 
-            service_data.update(response_data)
-            service_data['published_hash'] = self.hash
-            service_data['publicate_datetime'] = datetime.datetime.now().strftime(DT_FORMAT)
-            return service_data
+            if is_success:
+                service_data.update(response_data)
+                service_data['published_hash'] = self.hash
+                service_data['publicate_datetime'] = datetime.datetime.now().strftime(DT_FORMAT)
+                return True, service_data
+
+            return False, response_data
 
 
 def process_content(content, logger_action, action_data):

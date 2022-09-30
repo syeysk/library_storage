@@ -1,11 +1,10 @@
-from os import curdir, path, makedirs
-from threading import Thread
-from tkinter import (GROOVE, LEFT, RIGHT, TOP, Frame, LabelFrame, StringVar, Tk, W, SE, filedialog, Toplevel, VERTICAL,
-    Canvas, Y, ALL, BOTH, NW, X, Entry, Text)
-from tkinter.ttk import Button, Label, Radiobutton, Separator, Notebook, Scrollbar
+from os import path
+from tkinter import (GROOVE, LEFT, RIGHT, Frame, LabelFrame, StringVar, W, SE, filedialog, Toplevel,
+    BOTH, X, Entry, ALL)
+from tkinter.ttk import Button, Label, Notebook
 
-from gui import BasicGUI, build_scrollable_frame
 from knowledge_scanner import DEFAULT_PASSWORD_FILEPATH, DEFAULT_NOTES_DIRPATH, scan_knowlege
+from utils_gui import BasicGUI, build_scrollable_frame
 
 
 class GUI(BasicGUI):
@@ -23,10 +22,9 @@ class GUI(BasicGUI):
 
     def publicate_to(self, service_name, note):
         custom_data = note.custom[service_name]
-        service_data = note.publicate(service_name, self.password_filepath, self.password)
-        error = service_data.get('error')
-        if error:
-            print('Error:', error)
+        is_success, service_data = note.publicate(service_name, self.password_filepath, self.password)
+        if not is_success:
+            print('Error:', service_data)
         else:
             #lables['id'].configure(text=service_data['id'])
             custom_data['label_url'].configure(text=service_data['url'])
@@ -112,7 +110,16 @@ class GUI(BasicGUI):
                 else:
                     print(name, data)
 
-        self.run_func_in_thread(lambda: scan_knowlege(logger_action, self.notes_dirpath))
+        for child in self.frame_url.winfo_children():
+            child.destroy()
+
+        for child in self.frame_publication.winfo_children():
+            child.destroy()
+
+        for child in self.frame_other.winfo_children():
+            child.destroy()
+
+        self.run_func_in_thread(scan_knowlege, args=(logger_action, self.notes_dirpath))
 
     def select_notes_dirpath(self):
         notes_dirpath = filedialog.askdirectory(initialdir=self.notes_dirpath)
