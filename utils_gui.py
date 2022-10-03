@@ -27,7 +27,7 @@ class BasicGUI(Tk):
     def __init__(self):
         Tk.__init__(self)
 
-    def run_func_in_thread(self, func, args=(), kwargs=None, finish_func=None):
+    def run_func_in_thread(self, func, args=(), kwargs=None, finish_func=None, finish_args=()):
         def check():
             if thread.is_alive():
                 #print('поток продолжается')
@@ -36,7 +36,7 @@ class BasicGUI(Tk):
                 print('поток завершён')
                 # action after finishing thread
                 if finish_func:
-                    finish_func()
+                    finish_func(*finish_args)
 
         thread = Thread(None, func, args=args, kwargs=kwargs)
         thread.start()

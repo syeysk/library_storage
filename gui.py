@@ -5,6 +5,8 @@ from tkinter.ttk import Button, Label, Separator, Notebook
 from library_storage import LibraryStorage
 from utils_gui import BasicGUI, build_scrollable_frame
 
+DEFAULT_LIBRARY_DIRPATH = path.normpath('C:/Users/Public/СТелефона/ТекстКопия/')
+
 
 class GUI(BasicGUI):
     def __init__(self, lib_storage):
@@ -49,14 +51,22 @@ class GUI(BasicGUI):
                 return
 
             window = self.create_window_scan()
-            self.run_func_in_thread(self.fg_command_scan_files, lambda: self.lib_storage.select_db(self.storage_db))
+            self.run_func_in_thread(
+                self.fg_command_scan_files,
+                finish_func=self.lib_storage.select_db,
+                finish_args=(self.storage_db,),
+            )
         elif type_scan == 'structure':
             if not self.storage_structure:
                 print('Пожалуйста, выберите директорию хранилища')
                 return
 
             window = self.create_window_scan()
-            self.run_func_in_thread(self.fg_command_scan_structure, lambda: self.lib_storage.select_db(self.storage_db))
+            self.run_func_in_thread(
+                self.fg_command_scan_structure,
+                finish_func=self.lib_storage.select_db,
+                finish_args=self.storage_db,
+            )
 
     def fg_command_export(self):
         self.lib_storage.select_db(self.storage_db)
@@ -67,32 +77,29 @@ class GUI(BasicGUI):
 
     def command_export(self):
         if self.storage_structure:
-            self.run_func_in_thread(self.fg_command_export, lambda: self.lib_storage.select_db(self.storage_db))
+            self.run_func_in_thread(
+                self.fg_command_export,
+                finish_func=self.lib_storage.select_db,
+                finish_args=self.storage_db,
+            )
         else:
             print('Пожалуйста, выберите директорию структуры')
 
-    def select_storage(self, type_scan):
-        #type_scan = self.type_scan.get()
+    def set_storage(self, storage_path, type_scan):
         if type_scan == 'files':
-            self.storage_directory = filedialog.askdirectory(initialdir=curdir)
-            if not self.storage_directory:
-                return
-
+            self.storage_directory = storage_path
             self.storage_structure = '{}_structure'.format(self.storage_directory)  # '{}.zip'.format(storage_directory)
+            self.val_storage_directory.configure(text=self.storage_directory)
+
             self.storage_db = '{}.db'.format(self.storage_directory)
             if not path.exists(self.storage_structure):
                 makedirs(self.storage_structure, exist_ok=True)
-
-            self.val_storage_directory.configure(text=self.storage_directory)
         elif type_scan == 'structure':
             self.storage_directory = None
-            self.storage_structure = filedialog.askdirectory(initialdir=curdir)
-            if not self.storage_structure:
-                return
+            self.storage_structure = storage_path
+            self.val_storage_directory.configure(text='Не существует')
 
             self.storage_db = '{}.db'.format(self.storage_structure[:-len('_structure')])
-
-            self.val_storage_directory.configure(text='Не существует')
 
         self.val_stat_db_path.configure(text=self.storage_db)
         self.val_structure.configure(text=self.storage_structure)
@@ -100,6 +107,17 @@ class GUI(BasicGUI):
         self.lib_storage.select_db(self.storage_db)
         total_scanned_files = self.lib_storage.db.get_count_rows()
         self.progress_count_scanned_files(total_scanned_files)
+
+    def select_storage(self, type_scan):
+        if type_scan == 'files':
+            storage_path = filedialog.askdirectory(initialdir=curdir)
+        elif type_scan == 'structure':
+            storage_path = filedialog.askdirectory(initialdir=curdir)
+        else:
+            return
+
+        if storage_path:
+            self.set_storage(storage_path, type_scan)
 
     def select_storage_directory(self):
         self.select_storage('files')
@@ -129,7 +147,11 @@ class GUI(BasicGUI):
             print('Пожалуйста, выберите директорию копии хранилища')
             return
 
-        self.run_func_in_thread(self.fg_command_generate_diff, lambda: self.lib_storage.select_db(self.storage_db))
+        self.run_func_in_thread(
+            self.fg_command_generate_diff,
+            finish_func=self.lib_storage.select_db,
+            finish_args=self.storage_db,
+        )
 
     def hide_btn_command_scan_directory(self):
         self.btn_command_load_structure.state(['active', '!disabled'])
@@ -296,6 +318,8 @@ class GUI(BasicGUI):
         frame_input_copy_buttons.pack(side=TOP)
 
         frame_input_copy.pack()
+
+        self.set_storage(DEFAULT_LIBRARY_DIRPATH, 'files')
 
 
 if __name__ == '__main__':

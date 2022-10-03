@@ -197,7 +197,7 @@ class Note:
                 file_note.write('# {}\n\n'.format(self.title))
                 file_note.write('{}\n'.format(self.body))
         except Exception as error:
-            print('Error of saving note. Copy of original is here:', filepath_copy)
+            print('Error of saving note. Copy of original is here:', filepath_copy, 'Error:', error)
 
     def need_create_publication(self, service_name):
         """
