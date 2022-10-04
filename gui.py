@@ -65,7 +65,7 @@ class GUI(BasicGUI):
             self.run_func_in_thread(
                 self.fg_command_scan_structure,
                 finish_func=self.lib_storage.select_db,
-                finish_args=self.storage_db,
+                finish_args=(self.storage_db,),
             )
 
     def fg_command_export(self):
@@ -80,7 +80,7 @@ class GUI(BasicGUI):
             self.run_func_in_thread(
                 self.fg_command_export,
                 finish_func=self.lib_storage.select_db,
-                finish_args=self.storage_db,
+                finish_args=(self.storage_db,),
             )
         else:
             print('Пожалуйста, выберите директорию структуры')
@@ -150,7 +150,7 @@ class GUI(BasicGUI):
         self.run_func_in_thread(
             self.fg_command_generate_diff,
             finish_func=self.lib_storage.select_db,
-            finish_args=self.storage_db,
+            finish_args=(self.storage_db,),
         )
 
     def hide_btn_command_scan_directory(self):
@@ -323,7 +323,7 @@ class GUI(BasicGUI):
 
 
 if __name__ == '__main__':
-    with LibraryStorage(db_path='') as lib_storage:
+    with LibraryStorage() as lib_storage:
         gui = GUI(lib_storage)
         gui.create_window()
         gui.mainloop()

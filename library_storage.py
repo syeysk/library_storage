@@ -4,6 +4,7 @@ import os
 import sqlite3
 import zipfile
 from io import TextIOWrapper, StringIO
+from typing import Optional
 
 
 STATUS_NEW = 'Новый'
@@ -46,6 +47,11 @@ class DBStorage:
     SQL_DELETE_FILE = 'DELETE FROM files WHERE hash=?'
     SQL_INSERT_FILE = 'INSERT INTO files (hash, id, directory, filename) VALUES (?, ?, ?, ?)'
     SQL_UPDATE_FILE = 'UPDATE files SET directory=?, filename=? WHERE hash=?'
+    MESSAGE_DOUBLE = 'Обнаружен дубликат по хешу:\n   В базе: {}\n    Дубль: {}'
+    MESSAGE_DOUBLE_IMPORT = (
+        'Обнаружен дубликат файла с отличающимся именем среди порции вставляемых файлов: '
+        '{}\n    В базе:{}'
+    )
 
     def __init__(self, db_path: str) -> None:
         self.c = sqlite3.connect(db_path)
@@ -98,32 +104,20 @@ class DBStorage:
             existed_directory, existed_filename = None, None
             if is_exists:
                 file_id, existed_directory, existed_filename, is_deleted = is_exists
+                existed_filepath = os.path.join(existed_directory, existed_filename)
+                inserted_filepath = os.path.join(inserted_directory, inserted_filename)
                 if process_dublicate == 'original':
-                    print('Обнаружен дубликат по хешу:\n   В базе: {}\n    Дубль: {}'.format(
-                        os.path.join(existed_directory, existed_filename),
-                        os.path.join(inserted_directory, inserted_filename),
-                    ))
-                    if func_dublicate:
-                        func_dublicate(
-                            os.path.join(existed_directory, existed_filename),
-                            os.path.join(inserted_directory, inserted_filename),
-                        )
+                    if existed_filepath != inserted_filepath:
+                        print(self.MESSAGE_DOUBLE.format(existed_filepath, inserted_filepath))
+                        if func_dublicate:
+                            func_dublicate(existed_filepath, inserted_filepath)
                 elif process_dublicate == 'copy':
                     if is_deleted:
                         self.cu.execute('UPDATE files SET is_deleted=0 WHERE hash=?', (file_hash,))
                     else:
-                        print('Обнаружен дубликат по хешу:\n   В базе: {}\n    Дубль: {}'.format(
-                            os.path.join(existed_directory, existed_filename),
-                            os.path.join(inserted_directory, inserted_filename),
-                        ))
+                        print(self.MESSAGE_DOUBLE.format(existed_filepath, inserted_filepath))
                 elif process_dublicate == 'import_csv':
-                    raise Exception(
-                        'Обнаружен дубликат файла с отличающимся именем среди порции вставляемых файлов: '
-                        '{}\n    В базе:{}'.format(
-                            os.path.join(inserted_directory, inserted_filename),
-                            os.path.join(existed_directory, existed_filename),
-                        )
-                    )
+                    raise Exception(self.MESSAGE_DOUBLE_IMPORT.format(inserted_filepath, existed_filepath))
             else:
                 self.cu.execute(sql, sql_params)
                 file_id = self.cu.lastrowid
@@ -183,13 +177,15 @@ class LibraryStorage:
     CSV_COUNT_ROWS_ON_PAGE = 100
     ARCHIVE_DIFF_FILE_NAME = 'diff.csv'
 
-    def __init__(self, db_path: str) -> None:
+    def __init__(self, db_path: Optional[str] = None) -> None:
         """
         Инициализирует класс хранилища
         :param db_path:
         :param name:
         """
-        self.db = DBStorage(db_path=db_path)
+        self.db = None
+        if db_path:
+            self.select_db(db_path)
 
     def __enter__(self):
         return self
