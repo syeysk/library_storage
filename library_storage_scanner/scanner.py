@@ -264,7 +264,7 @@ class LibraryStorage:
         os.chdir(library_path)
         total_count_files = 0
         self.diffs = []
-        for directory, _, filenames in os.walk('./'):
+        for directory, _, filenames in os.walk('../'):
             directory = directory[2:]
             if os.path.sep == '\\':
                 directory = directory.replace('\\', '/')
@@ -428,7 +428,7 @@ if __name__ == '__main__':
     repository_path = os.path.dirname(__file__)
     #library_path = 'C:\\test\\Статьи'
     library_path = os.path.join(repository_path, 'example_library_origin')
-    library_path_changed = os.path.join(repository_path, 'example_library_changed')
+    library_path_changed = os.path.join(repository_path, '../example_library_changed')
     csv_path = os.path.join(repository_path, 'example_csv')
     diff_file_path = os.path.join(repository_path, 'example_diff.zip')
     db_path = ':memory:'

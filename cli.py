@@ -11,7 +11,7 @@
 import argparse
 import os
 
-from library_storage import LibraryStorage
+from library_storage_scanner.scanner import LibraryStorage
 
 DEFAULT_DB_PATH = os.path.expandvars(os.path.join('%TEMP%', 'cli_library_storage.db'))
 

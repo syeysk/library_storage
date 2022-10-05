@@ -1,9 +1,9 @@
 from os import path
 from tkinter import (GROOVE, LEFT, RIGHT, Frame, LabelFrame, StringVar, W, SE, filedialog, Toplevel,
-    BOTH, X, Entry, ALL)
+                     BOTH, X, Entry)
 from tkinter.ttk import Button, Label, Notebook
 
-from knowledge_scanner import DEFAULT_PASSWORD_FILEPATH, DEFAULT_NOTES_DIRPATH, scan_knowlege
+from notes_storage_scanner.scanner import DEFAULT_PASSWORD_FILEPATH, DEFAULT_NOTES_DIRPATH, scan_knowlege
 from utils_gui import BasicGUI, build_scrollable_frame
 
 

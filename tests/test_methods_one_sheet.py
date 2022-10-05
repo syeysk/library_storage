@@ -2,7 +2,7 @@ import zipfile
 
 from pyfakefs.fake_filesystem_unittest import TestCase
 
-from library_storage import LibraryStorage
+from library_storage_scanner.scanner import LibraryStorage
 
 ORIGIN_FS = (
     ('/origin/file01.txt', 'content01'),
