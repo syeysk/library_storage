@@ -3,6 +3,7 @@ from unittest.mock import patch
 
 from pyfakefs.fake_filesystem_unittest import TestCase
 
+from library_storage_scanner.exporters import CSVExporter
 from library_storage_scanner.scanner import LibraryStorage
 
 ORIGIN_DIFF_CSV = (
@@ -125,7 +126,7 @@ class CoreTestCase(TestCase):
         data_origin = self.origin_ls.db.cu.execute('select * from files').fetchall()
         self.assertEqual(origin_db, data_origin)
 
-        self.origin_ls.export_db_to_csv('/struct')
+        self.origin_ls.export_db_to_csv(CSVExporter('/struct'))
         with open('/struct/1.csv') as struct:
             self.assertEqual(origin_struct_1, struct.read())
 
