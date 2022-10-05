@@ -1,10 +1,43 @@
 from os import curdir, path, makedirs
-from tkinter import (GROOVE, LEFT, TOP, Frame, LabelFrame, StringVar, W, filedialog, Toplevel, BOTH, X)
+from tkinter import (GROOVE, LEFT, TOP, Frame, LabelFrame, StringVar, W, filedialog, Toplevel, BOTH, X, Radiobutton)
 from tkinter.ttk import Button, Label, Separator, Notebook
 
 from constants_paths import DEFAULT_LIBRARY_DIRPATH
+from library_storage_scanner.exporters import CSVExporter, MarkdownExporter
 from library_storage_scanner.scanner import LibraryStorage
 from utils_gui import BasicGUI, build_scrollable_frame
+
+
+class SelectExporterWindow(BasicGUI):
+
+    exporter_classes = {'csv': CSVExporter, 'markdown': MarkdownExporter}
+
+    def __init__(self, parent_window):
+        BasicGUI.__init__(self)
+
+        # self.exporter_str = StringVar()
+        self.parent_window = parent_window
+
+        Button(
+            self,
+            # variable=self.exporter_str,
+            text='CSV',
+            # value='csv',
+            command=lambda: self.set_exporter('csv'),
+        ).pack()
+        Button(
+            self,
+            # variable=self.exporter_str,
+            text='Markdown',
+            # value='markdown',
+            command=lambda: self.set_exporter('markdown'),
+        ).pack()
+
+    def set_exporter(self, exporter_str):
+        # exporter_str = self.exporter_str.get()
+        # print(exporter_str, self.exporter_str)
+        self.parent_window.exporter_class = self.exporter_classes[exporter_str]
+        self.destroy()
 
 
 class GUI(BasicGUI):
@@ -21,6 +54,8 @@ class GUI(BasicGUI):
 
         self.btn_command_scan_directory = None
         self.btn_command_load_structure = None
+
+        self.exporter_class = None
 
     def progress_count_exported_files(self, number_of_current_row, count_rows, csv_current_page):
         text = '{}/{} Страниц: {}'.format(number_of_current_row, count_rows, csv_current_page)
@@ -68,13 +103,19 @@ class GUI(BasicGUI):
             )
 
     def fg_command_export(self):
-        self.lib_storage.select_db(self.storage_db)
+        self.lib_storage.select_db(self.storage_db)  # TODO: Зачем это дублируется при создании фоновой команды?
         self.lib_storage.export_db_to_csv(
-            self.storage_structure,
+            exporter=self.exporter_class(self.storage_structure),
             progress_count_exported_files=self.progress_count_exported_files
         )
 
     def command_export(self):
+
+        window = SelectExporterWindow(self)
+        window.grab_set()
+        window.focus_set()
+        window.wait_window()
+
         if self.storage_structure:
             self.run_func_in_thread(
                 self.fg_command_export,
