@@ -264,7 +264,7 @@ class LibraryStorage:
         os.chdir(library_path)
         total_count_files = 0
         self.diffs = []
-        for directory, _, filenames in os.walk('../'):
+        for directory, _, filenames in os.walk('./'):
             directory = directory[2:]
             if os.path.sep == '\\':
                 directory = directory.replace('\\', '/')
