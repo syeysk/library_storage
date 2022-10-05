@@ -3,7 +3,8 @@ from tkinter import (GROOVE, LEFT, RIGHT, Frame, LabelFrame, StringVar, W, SE, f
                      BOTH, X, Entry)
 from tkinter.ttk import Button, Label, Notebook
 
-from notes_storage_scanner.scanner import DEFAULT_PASSWORD_FILEPATH, DEFAULT_NOTES_DIRPATH, scan_knowlege
+from constants_paths import DEFAULT_NOTES_DIRPATH, DEFAULT_PASSWORD_FILEPATH
+from notes_storage_scanner.scanner import scan_knowlege
 from utils_gui import BasicGUI, build_scrollable_frame
 
 

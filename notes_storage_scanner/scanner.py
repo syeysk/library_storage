@@ -36,8 +36,8 @@ from pykeepass.exceptions import CredentialsError
 import requests
 import yaml
 
-DEFAULT_PASSWORD_FILEPATH = os.path.normpath('D://Пароли.kdbx')
-DEFAULT_NOTES_DIRPATH = os.path.normpath('D://Текст')
+from constants_paths import DEFAULT_NOTES_DIRPATH
+
 IGNORE_PATHS = [
     os.path.normpath(f'{DEFAULT_NOTES_DIRPATH}/.obsidian'),
     os.path.normpath(f'{DEFAULT_NOTES_DIRPATH}/.trash'),

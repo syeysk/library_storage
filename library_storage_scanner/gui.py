@@ -2,10 +2,9 @@ from os import curdir, path, makedirs
 from tkinter import (GROOVE, LEFT, TOP, Frame, LabelFrame, StringVar, W, filedialog, Toplevel, BOTH, X)
 from tkinter.ttk import Button, Label, Separator, Notebook
 
+from constants_paths import DEFAULT_LIBRARY_DIRPATH
 from library_storage_scanner.scanner import LibraryStorage
 from utils_gui import BasicGUI, build_scrollable_frame
-
-DEFAULT_LIBRARY_DIRPATH = path.normpath('C:/Users/Public/СТелефона/ТекстКопия/')
 
 
 class GUI(BasicGUI):
