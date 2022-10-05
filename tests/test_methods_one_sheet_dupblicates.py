@@ -5,9 +5,6 @@ from pyfakefs.fake_filesystem_unittest import TestCase
 
 from library_storage_scanner.scanner import LibraryStorage
 
-
-
-
 ORIGIN_DIFF_CSV = (
     'Новый,,file01.txt,4256508e9e2099aa72050b5e00d01745153971e915fa190e4a86079a13ab8e73,1\n'
     'Новый,,file02.txt,982dfb44d32c54183e5399ae180a701d70c1434736645eea98c23e6a81b99d1b,2\n'

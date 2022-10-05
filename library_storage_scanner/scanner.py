@@ -6,7 +6,6 @@ import zipfile
 from io import TextIOWrapper, StringIO
 from typing import Optional
 
-
 STATUS_NEW = 'Новый'
 STATUS_MOVED = 'Переместили'
 STATUS_RENAMED = 'Переименовали'
