@@ -1,5 +1,5 @@
 from os import curdir, path, makedirs
-from tkinter import (GROOVE, LEFT, TOP, Frame, LabelFrame, StringVar, W, filedialog, Toplevel, BOTH, X, Radiobutton)
+from tkinter import (GROOVE, LEFT, TOP, Frame, LabelFrame, StringVar, W, filedialog, Toplevel, BOTH, X, Y)
 from tkinter.ttk import Button, Label, Separator, Notebook
 
 from constants_paths import DEFAULT_LIBRARY_DIRPATH
@@ -18,20 +18,21 @@ class SelectExporterWindow(BasicGUI):
         # self.exporter_str = StringVar()
         self.parent_window = parent_window
 
+        Label(self, text='Выберите формат сохранения:').pack(fill=Y)
         Button(
             self,
             # variable=self.exporter_str,
             text='CSV',
             # value='csv',
             command=lambda: self.set_exporter('csv'),
-        ).pack()
+        ).pack(fill=Y)
         Button(
             self,
             # variable=self.exporter_str,
             text='Markdown',
             # value='markdown',
             command=lambda: self.set_exporter('markdown'),
-        ).pack()
+        ).pack(fill=Y)
 
     def set_exporter(self, exporter_str):
         # exporter_str = self.exporter_str.get()
@@ -103,11 +104,13 @@ class GUI(BasicGUI):
             )
 
     def fg_command_export(self):
-        self.lib_storage.select_db(self.storage_db)  # TODO: Зачем это дублируется при создании фоновой команды?
-        self.lib_storage.export_db_to_csv(
-            exporter=self.exporter_class(self.storage_structure),
-            progress_count_exported_files=self.progress_count_exported_files
-        )
+        if self.exporter_class:
+            self.lib_storage.select_db(self.storage_db)  # TODO: Зачем это дублируется при создании фоновой команды?
+            self.lib_storage.export_db_to_csv(
+                exporter=self.exporter_class(self.storage_structure),
+                progress_count_exported_files=self.progress_count_exported_files
+            )
+            self.exporter_class = None
 
     def command_export(self):
 
@@ -150,9 +153,11 @@ class GUI(BasicGUI):
 
     def select_storage(self, type_scan):
         if type_scan == 'files':
-            storage_path = filedialog.askdirectory(initialdir=curdir)
+            filepath = self.storage_directory or curdir
+            storage_path = filedialog.askdirectory(initialdir=filepath)
         elif type_scan == 'structure':
-            storage_path = filedialog.askdirectory(initialdir=curdir)
+            filepath = self.storage_structure or curdir
+            storage_path = filedialog.askdirectory(initialdir=filepath)
         else:
             return
 

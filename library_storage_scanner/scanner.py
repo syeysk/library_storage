@@ -262,25 +262,25 @@ class LibraryStorage:
         csv_current_page = 1
         exporter.open_new_page(csv_current_page)
         number_of_last_row_on_current_page = self.CSV_COUNT_ROWS_ON_PAGE
-        count_rows = self.db.get_count_rows() if progress_count_exported_files else None
-        number_of_current_row = None
-        for number_of_current_row, row in enumerate(self.db.select_rows()):
+        count_rows = self.db.get_count_rows()
+        index_of_current_row = None
+        for index_of_current_row, row in enumerate(self.db.select_rows()):
             number_of_last_row_on_current_page = number_of_last_row_on_current_page - row[1] + 1
-            if number_of_current_row == number_of_last_row_on_current_page:
-                exporter.close()
+            if index_of_current_row == number_of_last_row_on_current_page:
+                exporter.close(is_last_page=index_of_current_row == count_rows - 1)
                 number_of_last_row_on_current_page += self.CSV_COUNT_ROWS_ON_PAGE
                 csv_current_page += 1
                 exporter.open_new_page(csv_current_page)
                 if progress_count_exported_files:
-                    progress_count_exported_files(number_of_current_row + 1, count_rows, csv_current_page)
+                    progress_count_exported_files(index_of_current_row + 1, count_rows, csv_current_page)
 
             exporter.write_row(row)
             number_of_last_row_on_current_page += row[1]
 
         if progress_count_exported_files:
-            progress_count_exported_files(number_of_current_row + 1, count_rows, csv_current_page)
+            progress_count_exported_files(index_of_current_row + 1, count_rows, csv_current_page)
 
-        exporter.close()
+        exporter.close(is_last_page=index_of_current_row is None or index_of_current_row == count_rows - 1)
 
     def import_csv_to_db(self, csv_path):
         for csv_filename in os.scandir(csv_path):
