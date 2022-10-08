@@ -4,7 +4,7 @@ from tkinter.ttk import Button, Label, Separator, Notebook
 
 from constants_paths import DEFAULT_LIBRARY_DIRPATH
 from library_storage_scanner.exporters import CSVExporter, MarkdownExporter
-from library_storage_scanner.scanner import LibraryStorage
+from library_storage_scanner.scanner import DBStorage, LibraryStorage
 from utils_gui import BasicGUI, build_scrollable_frame
 
 
@@ -66,7 +66,7 @@ class SelectExporterWindow(BasicGUI):
 
 
 class ScanWindow:
-    def __init__(self, parent_window, type_scan, lib_storage, storage_db, storage_path):
+    def __init__(self, parent_window, type_scan, lib_storage, storage_path):
         scan_window = Toplevel(parent_window)
         scan_window.overrideredirect = True
         self.parent_window = parent_window
@@ -81,17 +81,14 @@ class ScanWindow:
         notebook.add(container_info, text='Прочее')
 
         self.lib_storage = lib_storage
-        self.storage_db = storage_db
         self.storage_path = storage_path
         self.type_scan = type_scan
 
     def run(self):
         if self.type_scan == 'files':
             self.fg_command_scan_files()
-            lib_storage.select_db(self.storage_db)
         if self.type_scan == 'structure':
             self.fg_command_scan_structure()
-            lib_storage.select_db(self.storage_db)
 
     def add_dublicate_file_frame(self, existed_filepath, inserted_filepath):
         frame = Frame(self.frame_dublicates, relief=GROOVE, borderwidth=2, padx=10, pady=5)
@@ -115,7 +112,6 @@ class ScanWindow:
         self.parent_window.variable_count_scanned_files.set(total_scanned_files)
 
     def fg_command_scan_files(self):
-        self.lib_storage.select_db(self.storage_db)
         self.lib_storage.scan_to_db(
             self.storage_path,
             process_dublicate='original',
@@ -124,7 +120,6 @@ class ScanWindow:
         )
 
     def fg_command_scan_structure(self):
-        self.lib_storage.select_db(self.storage_db)
         self.lib_storage.import_csv_to_db(self.storage_path)
 
 
@@ -132,7 +127,6 @@ class GUI(BasicGUI):
     def __init__(self, lib_storage):
         BasicGUI.__init__(self)
         self.lib_storage = lib_storage
-        self.storage_db = ''
         self.storage_directory = None
         self.storage_structure = None
         self.type_scan = StringVar(value='files')
@@ -163,12 +157,12 @@ class GUI(BasicGUI):
                 print('Пожалуйста, выберите директорию хранилища')
                 return
 
-        window = ScanWindow(self, type_scan, self.lib_storage, self.storage_db, storage_path)
+        window = ScanWindow(self, type_scan, self.lib_storage, storage_path)
         self.run_func_in_thread(window.run)
 
     def fg_command_export(self, exporter_class):
         if exporter_class:
-            self.lib_storage.select_db(self.storage_db)  # TODO: Зачем это дублируется при создании фоновой команды?
+            self.lib_storage.db.reopen()
             self.lib_storage.export_db_to_csv(
                 exporter=exporter_class(self.storage_structure, self.storage_directory),
                 progress_count_exported_files=self.progress_count_exported_files
@@ -187,8 +181,7 @@ class GUI(BasicGUI):
             self.run_func_in_thread(
                 self.fg_command_export,
                 args=(data_for_update.get('exporter_class'),),
-                finish_func=self.lib_storage.select_db,
-                finish_args=(self.storage_db,),
+                finish_func=self.lib_storage.db.reopen,
             )
         else:
             print('Пожалуйста, выберите директорию структуры')
@@ -199,18 +192,18 @@ class GUI(BasicGUI):
             self.storage_structure = '{}_structure'.format(self.storage_directory)  # '{}.zip'.format(storage_directory)
             self.val_storage_directory.configure(text=self.storage_directory)
 
-            self.storage_db = '{}.db'.format(self.storage_directory)
+            storage_db = '{}.db'.format(self.storage_directory)
         elif type_scan == 'structure':
             self.storage_directory = None
             self.storage_structure = storage_path
             self.val_storage_directory.configure(text='Не существует')
 
-            self.storage_db = '{}.db'.format(self.storage_structure[:-len('_structure')])
+            storage_db = '{}.db'.format(self.storage_structure[:-len('_structure')])
 
-        self.val_stat_db_path.configure(text=self.storage_db)
+        self.val_stat_db_path.configure(text=storage_db)
         self.val_structure.configure(text=self.storage_structure)
 
-        self.lib_storage.select_db(self.storage_db)
+        self.lib_storage.set_db(DBStorage(storage_db))
         total_scanned_files = self.lib_storage.db.get_count_rows()
         self.variable_count_scanned_files.set(total_scanned_files)
 
@@ -242,7 +235,7 @@ class GUI(BasicGUI):
         self.diff_file_path = '{}_diff.zip'.format(self.storage_directory_copy)
 
     def fg_command_generate_diff(self):
-        self.lib_storage.select_db(self.storage_db)
+        # self.lib_storage.db.reopen()
         self.lib_storage.scan_to_db(
             self.storage_directory_copy,
             diff_file_path=self.diff_file_path,
@@ -257,8 +250,7 @@ class GUI(BasicGUI):
 
         self.run_func_in_thread(
             self.fg_command_generate_diff,
-            finish_func=self.lib_storage.select_db,
-            finish_args=(self.storage_db,),
+            # finish_func=self.lib_storage.db.reopen,
         )
 
     def create_window(self):
@@ -278,40 +270,32 @@ class GUI(BasicGUI):
         )
 
         frame_original = Frame(frame_input)
-        Button(
-            frame_original,
-            text='Открыть хранилище',
-            command=self.select_storage_directory
-        ).pack(side=LEFT)
-        Button(
-            frame_original,
-            text='Открыть структуру',
-            command=self.select_storage_structure
-        ).pack(side=LEFT)
+        Button(frame_original, text='Открыть хранилище', command=self.select_storage_directory).pack(side=LEFT)
+        Button(frame_original, text='Открыть структуру', command=self.select_storage_structure).pack(side=LEFT)
         frame_original.pack(side=TOP, anchor=W)
 
         frame_original_directory = Frame(frame_input)
-        rb_type_scan_files = Label(frame_original_directory, text='Хранилище:')
-        rb_type_scan_files.pack(side=LEFT)
+        Label(frame_original_directory, text='Хранилище:').pack(side=LEFT)
         self.val_storage_directory = Label(frame_original_directory, text='')
         self.val_storage_directory.pack(side=LEFT)
         frame_original_directory.pack(side=TOP, anchor=W)
 
         frame_original_structure = Frame(frame_input)
-        rb_type_scan_structure = Label(frame_original_structure, text='Структура:')
-        rb_type_scan_structure.pack(side=LEFT)
+        Label(frame_original_structure, text='Структура:').pack(side=LEFT)
         self.val_structure = Label(frame_original_structure, text='')
         self.val_structure.pack(side=LEFT)
         frame_original_structure.pack(side=TOP, anchor=W)
 
+        frame_original_db = Frame(frame_input)
+        Label(frame_original_db, text='База данных:').pack(side=LEFT)
+        self.val_stat_db_path = Label(frame_original_db, text='')
+        self.val_stat_db_path.pack(side=TOP)
+        frame_original_db.pack(side=TOP, anchor=W)
+
         frame_input_actions = Frame(frame_input)
 
         frame_input_buttons = Frame(frame_input_actions)
-        self.btn_command_scan_directory = Button(
-            frame_input_buttons,
-            text='Сканировать',
-            command=self.command_scan
-        )
+        self.btn_command_scan_directory = Button(frame_input_buttons, text='Сканировать', command=self.command_scan)
         self.btn_command_scan_directory.pack(side=LEFT)
         frame_input_buttons.pack()
         btn_command_export = Button(frame_input_buttons, text='Экспорт', command=self.command_export)
@@ -322,12 +306,18 @@ class GUI(BasicGUI):
 
         # Копия хранилища
 
-        frame_input_copy2 = LabelFrame(frame_inputs, text='Хранилище - копия', relief=GROOVE, borderwidth=2, padx=10,
-                                       pady=5)
+        frame_input_copy2 = LabelFrame(
+            frame_inputs,
+            text='Хранилище - копия',
+            relief=GROOVE,
+            borderwidth=2,
+            padx=10,
+            pady=5,
+        )
         btn_select_storage_directory_copy = Button(
             frame_input_copy2,
             text='Открыть структуру',
-            command=self.select_storage_structure_copy
+            command=self.select_storage_structure_copy,
         )
         btn_select_storage_directory_copy.pack()
         frame_input_copy2.pack(side=LEFT)
@@ -338,10 +328,6 @@ class GUI(BasicGUI):
         frame_inputs.pack(padx=5, pady=5)
 
         # Статистика
-
-        Label(self, text='База хранилища:').pack(side=TOP)
-        self.val_stat_db_path = Label(self, text='')
-        self.val_stat_db_path.pack(side=TOP)
 
         frame_statistic = Frame(self, relief=GROOVE, borderwidth=2, padx=10, pady=5)
         lbl_stat_count_files = Label(frame_statistic, text='Файлов отсканировано:')

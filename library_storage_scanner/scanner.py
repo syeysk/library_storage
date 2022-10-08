@@ -53,11 +53,19 @@ class DBStorage:
     )
 
     def __init__(self, db_path: str) -> None:
+        self.db_path = db_path
         self.c = sqlite3.connect(db_path)
         self.cu = self.c.cursor()
         self.cu.executescript(self.SQL_CREATE_TABLE)
         self.seq_sql_params = []
         self.duplicates_by_hash = {}
+
+    def reopen(self):
+        """
+        Переоткрывает существующую базу.
+        Вызываем метод внутри дочернего потока и после выхода из дочернего потока - в родительском """
+        self.c = sqlite3.connect(self.db_path)
+        self.cu = self.c.cursor()
 
     def clear(self) -> None:
         self.cu.execute('DELETE FROM files WHERE 1=1')
@@ -176,26 +184,20 @@ class LibraryStorage:
     CSV_COUNT_ROWS_ON_PAGE = 100
     ARCHIVE_DIFF_FILE_NAME = 'diff.csv'
 
-    def __init__(self, db_path: Optional[str] = None) -> None:
-        """
-        Инициализирует класс хранилища
-        :param db_path:
-        :param name:
-        """
+    def __init__(self) -> None:
+        """Инициализирует класс сканера хранилища"""
         self.db = None
-        if db_path:
-            self.select_db(db_path)
-
         self.diffs = None
 
     def __enter__(self):
         return self
 
     def __exit__(self, _1, _2, _3):
-        self.db.c.close()
+        if self.db:
+            self.db.c.close()
 
-    def select_db(self, db_path: str):
-        self.db = DBStorage(db_path=db_path)
+    def set_db(self, db):
+        self.db = db
 
     def scan_to_db(
             self,
