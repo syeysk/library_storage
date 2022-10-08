@@ -27,10 +27,10 @@ class CSVExporter:
 class MarkdownExporter:
     TABLE_HEADER = (
         '# Список книг из локального хранилища\n\n'
-        'ID | Описание | Ссылка на книгу\n'
+        'ID | Ссылка на описание | Ссылка на книгу\n'
         '--- | --- | ---\n'
     )
-    TABLE_ROW = '{id} | [Описание](книга_{id}) | [{name}]{relative_storage_pathdir}{pathdir}/{filename})\n'
+    TABLE_ROW = '{id} | [{hash}](книга_{id}) | [{name}]({relative_storage_pathdir}{pathdir}/{filename})\n'
     PREV_PAGE = '[<< Предыдщая страница](список_книг_{})'
     NEXT_PAGE = '[Следующая страница >>](список_книг_{})'
 
@@ -52,6 +52,7 @@ class MarkdownExporter:
         self.csv_file.write(
             self.TABLE_ROW.format(
                 id=row[1],
+                hash=row[0],
                 name=row[3].replace('[', '').replace(']', '').replace('(', '').replace(')', ''),
                 relative_storage_pathdir=os.path.relpath(self.storage_directory, self.storage_structure).replace('\\', '/'),
                 pathdir=quote('/{}'.format(row[2])) if row[2] else '',
