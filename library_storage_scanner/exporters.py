@@ -49,12 +49,15 @@ class MarkdownExporter:
         self.current_page = current_page
 
     def write_row(self, row):
+        # disk_one = self.storage_directory.split('://', 1)[0]
+        # disk_two = self.storage_structure.split('://', 1)[0]
+        relpath = os.path.relpath(self.storage_directory, self.storage_structure).replace('\\', '/')
         self.csv_file.write(
             self.TABLE_ROW.format(
                 id=row[1],
                 hash=row[0],
                 name=row[3].replace('[', '').replace(']', '').replace('(', '').replace(')', ''),
-                relative_storage_pathdir=os.path.relpath(self.storage_directory, self.storage_structure).replace('\\', '/'),
+                relative_storage_pathdir=relpath,
                 pathdir=quote('/{}'.format(row[2])) if row[2] else '',
                 filename=quote(row[3]),
             )

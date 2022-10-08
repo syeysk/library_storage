@@ -2,7 +2,7 @@ from os import curdir
 from tkinter import (GROOVE, LEFT, TOP, Frame, LabelFrame, StringVar, IntVar, W, filedialog, Toplevel, BOTH, X, Y)
 from tkinter.ttk import Button, Label, Separator, Notebook
 
-from constants_paths import DEFAULT_LIBRARY_DIRPATH
+from constants_paths import DEFAULT_LIBRARY_DIRPATH, DEFAULT_LIBRARY_STRUCTURE_DIRPATH
 from library_storage_scanner.exporters import CSVExporter, MarkdownExporter
 from library_storage_scanner.scanner import DBStorage, LibraryStorage
 from utils_gui import BasicGUI, build_scrollable_frame
@@ -84,6 +84,7 @@ class ScanWindow:
         self.type_scan = type_scan
 
     def run(self):
+        self.lib_storage.db.reopen()
         if self.type_scan == 'files':
             self.fg_command_scan_files()
         if self.type_scan == 'structure':
@@ -158,6 +159,7 @@ class GUI(BasicGUI):
 
         window = ScanWindow(self, type_scan, self.lib_storage, storage_path)
         self.run_func_in_thread(window.run)
+        self.lib_storage.db.reopen()
 
     def fg_command_export(self, exporter_class):
         if exporter_class:
@@ -368,6 +370,9 @@ class GUI(BasicGUI):
         frame_input_copy.pack()
 
         self.set_storage(DEFAULT_LIBRARY_DIRPATH, 'files')
+        if DEFAULT_LIBRARY_STRUCTURE_DIRPATH:
+            self.storage_structure = DEFAULT_LIBRARY_STRUCTURE_DIRPATH
+            self.val_structure.configure(text=DEFAULT_LIBRARY_STRUCTURE_DIRPATH)
 
 
 if __name__ == '__main__':

@@ -280,7 +280,7 @@ class LibraryStorage:
             exporter.write_row(row)
             number_of_last_row_on_current_page += row[1]
 
-        if progress_count_exported_files:
+        if progress_count_exported_files and index_of_current_row is not None:
             progress_count_exported_files(index_of_current_row + 1, count_rows, csv_current_page)
 
         exporter.close(is_last_page=index_of_current_row is None or index_of_current_row == count_rows - 1)
