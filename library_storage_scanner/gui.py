@@ -9,7 +9,6 @@ from utils_gui import BasicGUI, build_scrollable_frame
 
 
 class SelectExporterWindow(BasicGUI):
-
     exporter_classes = {'csv': CSVExporter, 'markdown': MarkdownExporter}
 
     def __init__(self, parent_window):
@@ -107,7 +106,7 @@ class GUI(BasicGUI):
         if self.exporter_class:
             self.lib_storage.select_db(self.storage_db)  # TODO: Зачем это дублируется при создании фоновой команды?
             self.lib_storage.export_db_to_csv(
-                exporter=self.exporter_class(self.storage_structure),
+                exporter=self.exporter_class(self.storage_structure, self.storage_directory),
                 progress_count_exported_files=self.progress_count_exported_files
             )
             self.exporter_class = None
@@ -250,7 +249,8 @@ class GUI(BasicGUI):
 
         frame_inputs = Frame(self)
 
-        frame_input = LabelFrame(frame_inputs, text='Хранилище оригинальное', relief=GROOVE, borderwidth=2, padx=10, pady=5)
+        frame_input = LabelFrame(frame_inputs, text='Хранилище оригинальное', relief=GROOVE, borderwidth=2, padx=10,
+                                 pady=5)
 
         frame_original = Frame(frame_input)
         Button(
@@ -283,7 +283,6 @@ class GUI(BasicGUI):
         self.val_structure.pack(side=LEFT)
         frame_original_structure.pack(side=TOP, anchor=W)
 
-
         # frame_input_radios = Frame(frame_input)
         # frame_input_radios.pack(side=LEFT)
 
@@ -309,7 +308,8 @@ class GUI(BasicGUI):
 
         # Копия хранилища
 
-        frame_input_copy2 = LabelFrame(frame_inputs, text='Хранилище - копия', relief=GROOVE, borderwidth=2, padx=10, pady=5)
+        frame_input_copy2 = LabelFrame(frame_inputs, text='Хранилище - копия', relief=GROOVE, borderwidth=2, padx=10,
+                                       pady=5)
         btn_select_storage_directory_copy = Button(
             frame_input_copy2,
             text='Открыть структуру',
@@ -320,7 +320,7 @@ class GUI(BasicGUI):
 
         separator = Separator(self, orient='horizontal')
         separator.pack()
-        
+
         frame_inputs.pack(padx=5, pady=5)
 
         # Статистика

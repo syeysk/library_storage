@@ -4,7 +4,7 @@ from urllib.parse import quote
 
 
 class CSVExporter:
-    def __init__(self, csv_path):
+    def __init__(self, csv_path, storage_directory):
         self.csv_path = csv_path
         self.csv_writer = None
         self.csv_file = None
@@ -28,14 +28,15 @@ class MarkdownExporter:
         'ID | Описание | Ссылка на книгу\n'
         '--- | --- | ---\n'
     )
-    TABLE_ROW = '{id} | [Описание](книга_{id}) | [{name}](D://Книги{pathdir}/{filename})\n'
+    TABLE_ROW = '{id} | [Описание](книга_{id}) | [{name}]{relative_storage_pathdir}{pathdir}/{filename})\n'
     PREV_PAGE = '[<< Предыдщая страница](список_книг_{})'
     NEXT_PAGE = '[Следующая страница >>](список_книг_{})'
 
-    def __init__(self, csv_path):
+    def __init__(self, csv_path, storage_directory):
         self.csv_path = csv_path
         self.csv_file = None
         self.current_page = None
+        self.storage_directory = storage_directory
 
     def open_new_page(self, current_page):
         csv_full_path = os.path.join(self.csv_path, 'список_книг_{}.md'.format(str(current_page)))
@@ -48,6 +49,7 @@ class MarkdownExporter:
             self.TABLE_ROW.format(
                 id=row[1],
                 name=row[3].replace('[', '').replace(']', '').replace('(', '').replace(')', ''),
+                relative_storage_pathdir=os.path.relpath(self.storage_directory, self.csv_path).replace('\\', '/'),
                 pathdir=quote('/{}'.format(row[2])) if row[2] else '',
                 filename=quote(row[3]),
             )
