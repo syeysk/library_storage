@@ -186,6 +186,8 @@ class LibraryStorage:
         if db_path:
             self.select_db(db_path)
 
+        self.diffs = None
+
     def __enter__(self):
         return self
 

@@ -4,13 +4,15 @@ from urllib.parse import quote
 
 
 class CSVExporter:
-    def __init__(self, csv_path, storage_directory):
-        self.csv_path = csv_path
+    def __init__(self, storage_structure, storage_directory):
         self.csv_writer = None
         self.csv_file = None
+        self.storage_structure = storage_structure
+        if not os.path.exists(self.storage_structure):
+            os.makedirs(self.storage_structure, exist_ok=True)
 
     def open_new_page(self, current_page):
-        csv_full_path = os.path.join(self.csv_path, '{}.csv'.format(str(current_page)))
+        csv_full_path = os.path.join(self.storage_structure, '{}.csv'.format(str(current_page)))
         self.csv_file = open(csv_full_path, 'w', encoding='utf-8', newline='\n')
         self.csv_writer = csv.writer(self.csv_file)
 
@@ -32,14 +34,16 @@ class MarkdownExporter:
     PREV_PAGE = '[<< Предыдщая страница](список_книг_{})'
     NEXT_PAGE = '[Следующая страница >>](список_книг_{})'
 
-    def __init__(self, csv_path, storage_directory):
-        self.csv_path = csv_path
+    def __init__(self, storage_structure, storage_directory):
+        self.storage_structure = storage_structure
         self.csv_file = None
         self.current_page = None
         self.storage_directory = storage_directory
+        if not os.path.exists(self.storage_structure):
+            os.makedirs(self.storage_structure, exist_ok=True)
 
     def open_new_page(self, current_page):
-        csv_full_path = os.path.join(self.csv_path, 'список_книг_{}.md'.format(str(current_page)))
+        csv_full_path = os.path.join(self.storage_structure, 'список_книг_{}.md'.format(str(current_page)))
         self.csv_file = open(csv_full_path, 'w', encoding='utf-8')
         self.csv_file.write(self.TABLE_HEADER)
         self.current_page = current_page
@@ -49,7 +53,7 @@ class MarkdownExporter:
             self.TABLE_ROW.format(
                 id=row[1],
                 name=row[3].replace('[', '').replace(']', '').replace('(', '').replace(')', ''),
-                relative_storage_pathdir=os.path.relpath(self.storage_directory, self.csv_path).replace('\\', '/'),
+                relative_storage_pathdir=os.path.relpath(self.storage_directory, self.storage_structure).replace('\\', '/'),
                 pathdir=quote('/{}'.format(row[2])) if row[2] else '',
                 filename=quote(row[3]),
             )

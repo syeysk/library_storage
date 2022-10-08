@@ -38,6 +38,6 @@ class BasicGUI(Tk):
                 if finish_func:
                     finish_func(*finish_args)
 
-        thread = Thread(None, func, args=args, kwargs=kwargs)
+        thread = Thread(group=None, target=func, args=args, kwargs=kwargs)
         thread.start()
         check()
