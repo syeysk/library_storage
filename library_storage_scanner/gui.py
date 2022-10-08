@@ -1,4 +1,4 @@
-from os import curdir, path, makedirs
+from os import curdir
 from tkinter import (GROOVE, LEFT, TOP, Frame, LabelFrame, StringVar, IntVar, W, filedialog, Toplevel, BOTH, X, Y)
 from tkinter.ttk import Button, Label, Separator, Notebook
 
@@ -11,13 +11,14 @@ from utils_gui import BasicGUI, build_scrollable_frame
 class SelectExporterWindow(BasicGUI):
     exporter_classes = {'csv': CSVExporter, 'markdown': MarkdownExporter}
 
-    def __init__(self, data_for_update, auto_storage_structure):
+    def __init__(self, data_for_update, storage_structure, auto_storage_structure):
         BasicGUI.__init__(self)
         self.data_for_update = data_for_update
         self.auto_storage_structure = auto_storage_structure
+        self.data_for_update['storage_structure'] = storage_structure
 
         frame_structure = LabelFrame(self, text='Куда экспортировать')
-        self.label_structure = Label(frame_structure, text='')
+        self.label_structure = Label(frame_structure, text=storage_structure)
         self.label_structure.pack(fill=X)
         frame_structure_buttons = Frame(frame_structure)
         Button(
@@ -47,8 +48,6 @@ class SelectExporterWindow(BasicGUI):
             command=lambda: self.set_exporter('markdown'),
         ).pack(side=LEFT)
         frame_format.pack(fill=X)
-
-        self.set_path_auto()
 
     def set_path_auto(self):
         self.data_for_update['storage_structure'] = self.auto_storage_structure
@@ -170,35 +169,42 @@ class GUI(BasicGUI):
 
     def command_export(self):
         data_for_update = {}
-        window = SelectExporterWindow(data_for_update, self.storage_structure)
+        window = SelectExporterWindow(
+            data_for_update,
+            self.storage_structure,
+            '{}_structure'.format(self.storage_directory),
+        )
         window.grab_set()
         window.focus_set()
         window.wait_window()
 
-        self.storage_structure = data_for_update['storage_structure']
+        storage_structure = data_for_update.get('storage_structure')
+        exporter_class = data_for_update.get('exporter_class')
 
-        if self.storage_structure:
+        if exporter_class:
+            self.storage_structure = storage_structure
+            self.val_structure.configure(text=self.storage_structure)
             self.run_func_in_thread(
                 self.fg_command_export,
-                args=(data_for_update.get('exporter_class'),),
+                args=(exporter_class,),
                 finish_func=self.lib_storage.db.reopen,
             )
-        else:
-            print('Пожалуйста, выберите директорию структуры')
 
     def set_storage(self, storage_path, type_scan):
         if type_scan == 'files':
             self.storage_directory = storage_path
             self.storage_structure = '{}_structure'.format(self.storage_directory)  # '{}.zip'.format(storage_directory)
             self.val_storage_directory.configure(text=self.storage_directory)
-
             storage_db = '{}.db'.format(self.storage_directory)
+            self.btn_command_export.state(['active', '!disabled'])
         elif type_scan == 'structure':
             self.storage_directory = None
             self.storage_structure = storage_path
             self.val_storage_directory.configure(text='Не существует')
-
             storage_db = '{}.db'.format(self.storage_structure[:-len('_structure')])
+            self.btn_command_export.state(['!active', 'disabled'])
+        else:
+            return
 
         self.val_stat_db_path.configure(text=storage_db)
         self.val_structure.configure(text=self.storage_structure)
@@ -208,14 +214,11 @@ class GUI(BasicGUI):
         self.variable_count_scanned_files.set(total_scanned_files)
 
     def select_storage(self, type_scan):
+        storage_path = None
         if type_scan == 'files':
-            filepath = self.storage_directory or curdir
-            storage_path = filedialog.askdirectory(initialdir=filepath)
+            storage_path = filedialog.askdirectory(initialdir=self.storage_directory or curdir)
         elif type_scan == 'structure':
-            filepath = self.storage_structure or curdir
-            storage_path = filedialog.askdirectory(initialdir=filepath)
-        else:
-            return
+            storage_path = filedialog.askdirectory(initialdir=self.storage_structure or curdir)
 
         if storage_path:
             self.set_storage(storage_path, type_scan)
@@ -298,8 +301,8 @@ class GUI(BasicGUI):
         self.btn_command_scan_directory = Button(frame_input_buttons, text='Сканировать', command=self.command_scan)
         self.btn_command_scan_directory.pack(side=LEFT)
         frame_input_buttons.pack()
-        btn_command_export = Button(frame_input_buttons, text='Экспорт', command=self.command_export)
-        btn_command_export.pack()
+        self.btn_command_export = Button(frame_input_buttons, text='Экспорт', command=self.command_export)
+        self.btn_command_export.pack()
 
         frame_input_actions.pack(side=LEFT)
         frame_input.pack(side=LEFT, padx=5, pady=5)
