@@ -3,7 +3,7 @@ import zipfile
 from pyfakefs.fake_filesystem_unittest import TestCase
 
 from library_storage_scanner.exporters import CSVExporter
-from library_storage_scanner.scanner import LibraryStorage
+from library_storage_scanner.scanner import DBStorage, LibraryStorage
 
 ORIGIN_FS = (
     ('/origin/file01.txt', 'content01'),
@@ -56,8 +56,10 @@ class CoreTestCase(TestCase):
         self.setUpPyfakefs()
         self.create_files(ORIGIN_FS)
         self.fs.create_dir('/struct')
-        self.origin_ls = LibraryStorage(db_path=':memory:')
-        self.copy_ls = LibraryStorage(db_path=':memory:')
+        self.origin_ls = LibraryStorage()
+        self.origin_ls.set_db(DBStorage(':memory:'))
+        self.copy_ls = LibraryStorage()
+        self.copy_ls.set_db(DBStorage(':memory:'))
 
     def tearDown(self):
         self.origin_ls.__exit__(None, None, None)
@@ -70,7 +72,7 @@ class CoreTestCase(TestCase):
         data_origin = self.origin_ls.db.cu.execute('select * from files').fetchall()
         self.assertEqual(ORIGIN_DB, data_origin)
 
-        self.origin_ls.export_db_to_csv(CSVExporter('/struct'))
+        self.origin_ls.export_db_to_csv(CSVExporter('/struct', None))
         with open('/struct/1.csv') as struct:
             self.assertEqual(ORIGIN_STRUCT_1, struct.read())
 

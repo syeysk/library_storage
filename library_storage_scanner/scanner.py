@@ -31,7 +31,7 @@ class DBStorage:
     SQL_INSERT_ROW = 'INSERT INTO files (hash, directory, filename) VALUES (?, ?, ?)'
     SQL_INSERT_ROW_WITH_ID = 'INSERT INTO files (hash, id, directory, filename) VALUES (?, ?, ?, ?)'
     SQL_SELECT_COUNT_ROWS = 'SELECT COUNT(id) FROM files'
-    SQL_SELECT_ROWS = 'SELECT hash, id, directory, filename FROM files LIMIT ?,?'
+    SQL_SELECT_ROWS = 'SELECT hash, id, directory, filename FROM files WHERE is_deleted = 0 LIMIT ?,?'
     SQL_SELECT_ROWS_ONLY_DELETED = 'SELECT hash, id, directory, filename FROM files WHERE is_deleted=1 LIMIT ?,?'
     SQL_UPDATE_SET_IS_DELETED = 'UPDATE files SET is_deleted=1'
     SQL_CREATE_TABLE = '''
@@ -101,7 +101,7 @@ class DBStorage:
         иначе - возбуждать исключение
         :return:
         """
-        sql = self.SQL_INSERT_ROW_WITH_ID if with_id else self.SQL_INSERT_ROW
+        sql_insert = self.SQL_INSERT_ROW_WITH_ID if with_id else self.SQL_INSERT_ROW
         for sql_params in self.seq_sql_params:
             file_hash = sql_params[0]
             sql_select = 'SELECT id, directory, filename, is_deleted FROM files WHERE hash=?'
@@ -113,19 +113,32 @@ class DBStorage:
                 existed_filepath = os.path.join(existed_directory, existed_filename)
                 inserted_filepath = os.path.join(inserted_directory, inserted_filename)
                 if process_dublicate == 'original':
-                    if existed_filepath != inserted_filepath:
-                        print(self.MESSAGE_DOUBLE.format(existed_filepath, inserted_filepath))
-                        if func_dublicate:
-                            func_dublicate(existed_filepath, inserted_filepath)
-                elif process_dublicate == 'copy':
-                    if is_deleted:
+                    if existed_filepath == inserted_filepath:
+                        # обнаружен дубликат с тем же имененм - всё нормально, это один и тот же файл
                         self.cu.execute('UPDATE files SET is_deleted=0 WHERE hash=?', (file_hash,))
                     else:
+                        if not os.path.exists(existed_filepath):
+                            # первоначального файла не существует, что означиет, что дубликат - это переименованый файл
+                            self.cu.execute(
+                                'UPDATE files SET is_deleted=0, directory=?, filename=? WHERE hash=?',
+                                (inserted_directory, inserted_filename, file_hash),
+                            )
+                        else:
+                            # обнаружен дубликат с отличающимся именем и существующим первоначальным файлом -
+                            # - уведомляем об этом, чтобы пользователь мог удалить один из них
+                            print(self.MESSAGE_DOUBLE.format(existed_filepath, inserted_filepath))
+                            if func_dublicate:
+                                func_dublicate(existed_filepath, inserted_filepath)
+                elif process_dublicate == 'copy':
+                    # игнорируем любые дубликаты - они из копии в оригинал не попадут
+                    if is_deleted:
+                        self.cu.execute('UPDATE files SET is_deleted=0 WHERE hash=?', (file_hash,))
+                    else: # для прохождения тестов
                         print(self.MESSAGE_DOUBLE.format(existed_filepath, inserted_filepath))
                 elif process_dublicate == 'import_csv':
                     raise Exception(self.MESSAGE_DOUBLE_IMPORT.format(inserted_filepath, existed_filepath))
             else:
-                self.cu.execute(sql, sql_params)
+                self.cu.execute(sql_insert, sql_params)
                 file_id = self.cu.lastrowid
 
             if func:

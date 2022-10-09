@@ -86,9 +86,9 @@ class ScanWindow:
     def run(self):
         self.lib_storage.db.reopen()
         if self.type_scan == 'files':
-            self.fg_command_scan_files()
+            self.command_scan_files()
         if self.type_scan == 'structure':
-            self.fg_command_scan_structure()
+            self.command_scan_structure()
 
     def add_dublicate_file_frame(self, existed_filepath, inserted_filepath):
         frame = Frame(self.frame_dublicates, relief=GROOVE, borderwidth=2, padx=10, pady=5)
@@ -111,7 +111,7 @@ class ScanWindow:
     def progress_count_scanned_files(self, total_scanned_files):
         self.parent_window.variable_count_scanned_files.set(total_scanned_files)
 
-    def fg_command_scan_files(self):
+    def command_scan_files(self):
         self.lib_storage.scan_to_db(
             self.storage_path,
             process_dublicate='original',
@@ -119,7 +119,7 @@ class ScanWindow:
             func_dublicate=self.add_dublicate_file_frame
         )
 
-    def fg_command_scan_structure(self):
+    def command_scan_structure(self):
         self.lib_storage.import_csv_to_db(self.storage_path)
 
 
@@ -158,8 +158,8 @@ class GUI(BasicGUI):
                 return
 
         window = ScanWindow(self, type_scan, self.lib_storage, storage_path)
-        self.run_func_in_thread(window.run)
-        self.lib_storage.db.reopen()
+        self.run_func_in_thread(window.run, finish_func=self.lib_storage.db.reopen)
+        # self.lib_storage.db.reopen()
 
     def fg_command_export(self, exporter_class):
         if exporter_class:

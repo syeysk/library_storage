@@ -4,7 +4,7 @@ from unittest.mock import patch
 from pyfakefs.fake_filesystem_unittest import TestCase
 
 from library_storage_scanner.exporters import CSVExporter
-from library_storage_scanner.scanner import LibraryStorage
+from library_storage_scanner.scanner import DBStorage, LibraryStorage
 
 ORIGIN_DIFF_CSV = (
     'Новый,,file01.txt,4256508e9e2099aa72050b5e00d01745153971e915fa190e4a86079a13ab8e73,1\n'
@@ -26,8 +26,10 @@ class CoreTestCase(TestCase):
     def setUp(self):
         self.setUpPyfakefs()
         self.fs.create_dir('/struct')
-        self.origin_ls = LibraryStorage(db_path=':memory:')
-        self.copy_ls = LibraryStorage(db_path=':memory:')
+        self.origin_ls = LibraryStorage()
+        self.origin_ls.set_db(DBStorage(':memory:'))
+        self.copy_ls = LibraryStorage()
+        self.copy_ls.set_db(DBStorage(':memory:'))
 
     def tearDown(self):
         self.origin_ls.__exit__(None, None, None)
@@ -126,7 +128,7 @@ class CoreTestCase(TestCase):
         data_origin = self.origin_ls.db.cu.execute('select * from files').fetchall()
         self.assertEqual(origin_db, data_origin)
 
-        self.origin_ls.export_db_to_csv(CSVExporter('/struct'))
+        self.origin_ls.export_db_to_csv(CSVExporter('/struct', None))
         with open('/struct/1.csv') as struct:
             self.assertEqual(origin_struct_1, struct.read())
 

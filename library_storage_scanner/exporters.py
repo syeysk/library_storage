@@ -19,7 +19,7 @@ class CSVExporter:
     def write_row(self, row):
         self.csv_writer.writerow(row)
 
-    def close(self, _):
+    def close(self, is_last_page):
         if self.csv_file:
             self.csv_file.close()
 
