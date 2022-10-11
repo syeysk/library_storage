@@ -5,6 +5,8 @@ import sqlite3
 import zipfile
 from io import TextIOWrapper, StringIO
 
+from constants_paths import LIBRARY_IGNORE_EXTENSIONS
+
 STATUS_NEW = 'Новый'
 STATUS_MOVED = 'Переместили'
 STATUS_RENAMED = 'Переименовали'
@@ -248,6 +250,9 @@ class LibraryStorage:
                 directory = directory.replace('\\', '/')
 
             for filename in filenames:
+                if filename.split('.')[-1] in LIBRARY_IGNORE_EXTENSIONS:
+                    continue  # останется отмеченным как удалённый, а потому в структуру (экспорт) не попадёт
+
                 file_hash = get_file_hash(os.path.join(directory, filename))
                 self.db.append_row((file_hash, directory, filename))
                 total_count_files += 1
