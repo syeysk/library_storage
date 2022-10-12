@@ -30,7 +30,7 @@ class MarkdownExporter:
         'ID | Ссылка на описание | Ссылка на книгу\n'
         '--- | --- | ---\n'
     )
-    TABLE_ROW = '{id} | [{hash}](книга_{id}) | [{name}]({relative_storage_pathdir}{pathdir}/{filename})\n'
+    TABLE_ROW = '{id} | [{hash}](книга_{id}) | [{name}](file://{relative_storage_pathdir}{pathdir}/{filename})\n'
     PREV_PAGE = '[<< Предыдщая страница](список_книг_{})'
     NEXT_PAGE = '[Следующая страница >>](список_книг_{})'
 

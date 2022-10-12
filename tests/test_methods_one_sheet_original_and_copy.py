@@ -66,6 +66,11 @@ class CoreTestCase(TestCase):
         self.copy_ls.__exit__(None, None, None)
 
     def all_process(self, copy_fs, copy_db, copy_diff_csv, origin_db_after_applying_diff):
+        """
+        Общий для тестов метод. Выполяет для оригинальной базы: сканирование хранилища, экспорт.
+        Затем для копии делает следующее: импорт структуры, сканирование копии, сохраненеи diff-файла.
+        В итоге применяет diff-файл к оригинальному хранилищу.
+        """
         self.create_files(copy_fs)
 
         self.origin_ls.scan_to_db(library_path='/origin', process_dublicate='original')
