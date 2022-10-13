@@ -1,4 +1,3 @@
-import os.path
 from unittest.mock import patch
 
 from pyfakefs.fake_filesystem_unittest import TestCase
@@ -66,8 +65,8 @@ class CoreTestCase(TestCase):
             self.assertEqual(1, mock_print.call_count)
             self.assertEqual(
                 'Обнаружен дубликат по хешу:\n'
-                '   В базе: directory01{sep}file04.txt\n'
-                '    Дубль: directory01111{sep}duplicate.txt'.format(sep=os.path.sep),
+                '   В базе: directory01/file04.txt\n'
+                '    Дубль: directory01111/duplicate.txt',
                 mock_print.mock_calls[0].args[0],
             )
 
@@ -144,6 +143,6 @@ class CoreTestCase(TestCase):
             self.assertEqual(
                 f'Обнаружен дубликат по хешу:\n'
                 '   В базе: file05.txt\n'
-                '    Дубль: directory01{sep}duplicate.txt'.format(sep=os.path.sep),
+                '    Дубль: directory01/duplicate.txt',
                 mock_print.mock_calls[0].args[0],
             )
