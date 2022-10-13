@@ -30,7 +30,6 @@ def get_file_hash(file_path):
 class DBStorage:
     COUNT_ROWS_FOR_INSERT = 30
     COUNT_ROWS_ON_PAGE = 10
-    SQL_INSERT_FILE = 'INSERT INTO files (hash, id, directory, filename) VALUES (?, ?, ?, ?)'
     SQL_INSERT_ROW = 'INSERT INTO files (hash, directory, filename) VALUES (?, ?, ?)'
     SQL_INSERT_ROW_WITH_ID = 'INSERT INTO files (hash, id, directory, filename) VALUES (?, ?, ?, ?)'
     SQL_SELECT_COUNT_ROWS = 'SELECT COUNT(id) FROM files'
@@ -147,7 +146,7 @@ class DBStorage:
 
     def insert_file(self, file_hash, file_id, inserted_file):
         self.cu.execute(
-            self.SQL_INSERT_FILE,
+            self.SQL_INSERT_ROW_WITH_ID,
             (file_hash, file_id, os.path.dirname(inserted_file), os.path.basename(inserted_file))
         )
         self.c.commit()
@@ -196,7 +195,6 @@ class LibraryStorage:
     ):
         """Сканирует информацию о файлах в директории и заносит её в базу"""
         def process_file_status(*args):
-            # self.process_file_status(process_dublicate, func_dublicate, *args)
             status, existed_path, inserted_path = self.get_file_status(*args[:5])
             inserted_directory, inserted_filename, is_exists, _, _1, file_hash, file_id, is_deleted = args
             if is_exists:
@@ -382,53 +380,3 @@ def apply_diff(path_to_library, path_to_diff):
     with LibraryStorage(':memory:') as lib_storage:
         lib_storage.scan_to_db(library_path=path_to_library)
         lib_storage.apply_diff(library_path=path_to_library, diff_file_zip_path=path_to_diff)
-
-
-if __name__ == '__main__':
-    repository_path = os.path.dirname(__file__)
-    #library_path = 'C:\\test\\Статьи'
-    library_path = os.path.join(repository_path, 'example_library_origin')
-    library_path_changed = os.path.join(repository_path, '../example_library_changed')
-    csv_path = os.path.join(repository_path, 'example_csv')
-    diff_file_path = os.path.join(repository_path, 'example_diff.zip')
-    db_path = ':memory:'
-    os.chdir(library_path)
-
-    if not os.path.exists(csv_path):
-        os.makedirs(csv_path)
-    else:
-        if not os.path.isdir(csv_path):
-            raise Exception('Не является директорией: csv_path =', csv_path)
-
-    with LibraryStorage(db_path=db_path) as lib_storage:
-        lib_storage.scan_to_db(library_path=library_path)
-        lib_storage.export_db_to_csv(csv_path)
-        print('Кол-во строк до очистки:', lib_storage.db.get_count_rows())
-        lib_storage.db.clear()
-        print('Кол-во строк после очистки:', lib_storage.db.get_count_rows())
-        lib_storage.import_csv_to_db(csv_path)
-        print('Кол-во строк после импорта:', lib_storage.db.get_count_rows())
-        print('\nСканируем изменённую базу...')
-        lib_storage.scan_to_db(library_path=library_path_changed)
-        lib_storage.save_diff(library_path=library_path_changed, diff_file_path=diff_file_path)
-        library_path_copy = '{}_copy'.format(library_path)
-        for directory_path, directories, filenames in os.walk(library_path):
-            directory_copy = directory_path[len(library_path)+1:]
-            directory_copy = os.path.join(library_path_copy, directory_copy)
-            for filename in filenames:
-                file_path = os.path.normpath(os.path.join(directory_path, filename))
-                file_path_copy = os.path.normpath(os.path.join(directory_copy, filename))
-                dirname_copy = os.path.dirname(file_path_copy)
-                if not os.path.exists(dirname_copy):
-                    os.makedirs(dirname_copy)
-
-                with open(file_path, 'rb') as file_orig, open(file_path_copy, 'wb') as file_copy:
-                    file_copy.write(file_orig.read())
-
-            for directory in directories:
-                file_path = os.path.normpath(os.path.join(directory_path, directory))
-                file_path_copy = os.path.normpath(os.path.join(directory_copy, directory))
-                if not os.path.exists(file_path_copy):
-                    os.makedirs(file_path_copy)
-
-        lib_storage.apply_diff(library_path=library_path_copy, diff_file_zip_path=diff_file_path)
