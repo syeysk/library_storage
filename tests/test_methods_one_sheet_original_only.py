@@ -1,3 +1,4 @@
+import os.path
 import copy
 
 from pyfakefs.fake_filesystem_unittest import TestCase
@@ -118,10 +119,33 @@ class CoreTestCase(TestCase):
         origin_struct_after_second_scanning[3] = ','.join(row)
         self.check_second_scanning(origin_db_after_second_scanning, '\n'.join(origin_struct_after_second_scanning))
 
-    """def test_all_process_move_file(self):
-        self.all_process(copy_fs, copy_db, copy_diff_csv, origin_db_after_applying_diff)
+    def test_all_process_move_file(self):
+        moved_filepath = ORIGIN_FS[3][0]
+        new_dirpath = os.path.join(
+            os.path.dirname(os.path.dirname(moved_filepath)),
+            'new_dir',
+        ).replace('\\', '/')
+        self.fs.create_dir(new_dirpath)
+        new_filepath = os.path.join(
+            new_dirpath,
+            os.path.basename(moved_filepath),
+        )
+        self.fs.rename(moved_filepath, new_filepath)
+        origin_db_after_second_scanning = copy.deepcopy(ORIGIN_DB)
+        origin_db_after_second_scanning[3] = (
+            origin_db_after_second_scanning[3][0],
+            origin_db_after_second_scanning[3][1],
+            new_dirpath.replace('/origin/', ''),
+            origin_db_after_second_scanning[3][3],
+            0,
+        )
+        origin_struct_after_second_scanning = ORIGIN_STRUCT.split('\n')
+        row = origin_struct_after_second_scanning[3].split(',')
+        row[-2] = new_dirpath.replace('/origin/', '')
+        origin_struct_after_second_scanning[3] = ','.join(row)
+        self.check_second_scanning(origin_db_after_second_scanning, '\n'.join(origin_struct_after_second_scanning))
 
-    def test_all_process_moved_and_renamed_file(self):
+    """def test_all_process_moved_and_renamed_file(self):
         self.all_process(copy_fs, copy_db, copy_diff_csv, origin_db_after_applying_diff)
 
     def test_all_process_moved_file_and_add_another_file_with_the_same_name(self):
