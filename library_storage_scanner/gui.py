@@ -83,6 +83,7 @@ class ScanWindow:
         self.lib_storage = lib_storage
         self.storage_path = storage_path
         self.type_scan = type_scan
+        self.dublicate_frames = {}
 
     def run(self):
         self.lib_storage.db.reopen()
@@ -103,7 +104,7 @@ class ScanWindow:
     def add_dublicate_file_frame(self, existed_filepath, inserted_filepath, file_hash):
         def delete_inserted_file():
             remove(inserted_filepath)
-            button_existed.state(['!active', 'disabled'])
+            #button_existed.state(['!active', 'disabled'])
             button_inserted.state(['!active', 'disabled'])
 
         def delete_existed_file():
@@ -111,12 +112,15 @@ class ScanWindow:
             self.lib_storage.db.update(file_hash, dirname(inserted_filepath), basename(inserted_filepath))
             remove(actual_filepath)
             button_existed.state(['!active', 'disabled'])
-            button_inserted.state(['!active', 'disabled'])
+            #button_inserted.state(['!active', 'disabled'])
 
-        frame = LabelFrame(self.frame_dublicates, text=file_hash, relief=GROOVE, borderwidth=2, padx=10, pady=5)
-        frame.pack(fill=X)
+        frame = self.dublicate_frames.get(file_hash)
+        if not frame:
+            frame = LabelFrame(self.frame_dublicates, text=file_hash, relief=GROOVE, borderwidth=2, padx=10, pady=5)
+            frame.pack(fill=X)
+            self.dublicate_frames[file_hash] = frame
+            button_existed = self.build_button_delete_dublicate_file(frame, existed_filepath, delete_existed_file)
 
-        button_existed = self.build_button_delete_dublicate_file(frame, existed_filepath, delete_existed_file)
         button_inserted = self.build_button_delete_dublicate_file(frame, inserted_filepath, delete_inserted_file)
 
     def progress_count_scanned_files(self, total_scanned_files):
