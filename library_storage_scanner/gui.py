@@ -1,4 +1,5 @@
-from os import curdir
+from os import curdir, remove
+from os.path import basename, dirname
 from tkinter import (GROOVE, LEFT, TOP, Frame, LabelFrame, StringVar, IntVar, W, filedialog, Toplevel, BOTH, X, Y)
 from tkinter.ttk import Button, Label, Separator, Notebook
 
@@ -90,23 +91,33 @@ class ScanWindow:
         if self.type_scan == 'structure':
             self.command_scan_structure()
 
-    def add_dublicate_file_frame(self, existed_filepath, inserted_filepath):
-        frame = Frame(self.frame_dublicates, relief=GROOVE, borderwidth=2, padx=10, pady=5)
+    @staticmethod
+    def build_button_delete_dublicate_file(master, viewed_filepath, command):
+        frame = Frame(master)
+        frame.pack(anchor=W)
+        button = Button(frame, text='Удалить', command=command)
+        button.pack(side=LEFT)
+        Label(frame, text=viewed_filepath).pack(side=LEFT)
+        return button
+
+    def add_dublicate_file_frame(self, existed_filepath, inserted_filepath, file_hash):
+        def delete_inserted_file():
+            remove(inserted_filepath)
+            button_existed.state(['!active', 'disabled'])
+            button_inserted.state(['!active', 'disabled'])
+
+        def delete_existed_file():
+            actual_filepath = self.lib_storage.db.get_filepath(file_hash)
+            self.lib_storage.db.update(file_hash, dirname(inserted_filepath), basename(inserted_filepath))
+            remove(actual_filepath)
+            button_existed.state(['!active', 'disabled'])
+            button_inserted.state(['!active', 'disabled'])
+
+        frame = LabelFrame(self.frame_dublicates, text=file_hash, relief=GROOVE, borderwidth=2, padx=10, pady=5)
         frame.pack(fill=X)
 
-        frame1 = Frame(frame)
-        frame1.pack(anchor=W)
-        button1 = Button(frame1, text='Удалить')
-        button1.pack(side=LEFT)
-        existed_label = Label(frame1, text=existed_filepath)
-        existed_label.pack(side=LEFT)
-
-        frame2 = Frame(frame)
-        frame2.pack(anchor=W)
-        button2 = Button(frame2, text='Удалить')
-        button2.pack(side=LEFT)
-        inserted_label = Label(frame2, text=inserted_filepath)
-        inserted_label.pack(side=LEFT)
+        button_existed = self.build_button_delete_dublicate_file(frame, existed_filepath, delete_existed_file)
+        button_inserted = self.build_button_delete_dublicate_file(frame, inserted_filepath, delete_inserted_file)
 
     def progress_count_scanned_files(self, total_scanned_files):
         self.parent_window.variable_count_scanned_files.set(total_scanned_files)

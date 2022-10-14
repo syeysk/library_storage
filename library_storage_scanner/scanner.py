@@ -32,6 +32,7 @@ class DBStorage:
     COUNT_ROWS_ON_PAGE = 10
     SQL_INSERT_ROW = 'INSERT INTO files (hash, directory, filename) VALUES (?, ?, ?)'
     SQL_INSERT_ROW_WITH_ID = 'INSERT INTO files (hash, id, directory, filename) VALUES (?, ?, ?, ?)'
+    SQL_SELECT_FILE = 'SELECT id, directory, filename, is_deleted FROM files WHERE hash=?'
     SQL_SELECT_COUNT_ROWS = 'SELECT COUNT(id) FROM files'
     SQL_SELECT_ROWS = 'SELECT hash, id, directory, filename FROM files WHERE is_deleted = 0 LIMIT ?,?'
     SQL_SELECT_ROWS_ONLY_DELETED = 'SELECT hash, id, directory, filename FROM files WHERE is_deleted=1 LIMIT ?,?'
@@ -94,8 +95,7 @@ class DBStorage:
         sql_insert = self.SQL_INSERT_ROW_WITH_ID if with_id else self.SQL_INSERT_ROW
         for sql_params in self.seq_sql_params:
             file_hash = sql_params[0]
-            sql_select = 'SELECT id, directory, filename, is_deleted FROM files WHERE hash=?'
-            is_exists = self.cu.execute(sql_select, (file_hash,)).fetchone()
+            is_exists = self.cu.execute(self.SQL_SELECT_FILE, (file_hash,)).fetchone()
             inserted_directory, inserted_filename = sql_params[2 if with_id else 1:]
             existed_directory, existed_filename, is_deleted = None, None, None
             if is_exists:
@@ -161,6 +161,10 @@ class DBStorage:
     def update(self, file_hash, inserted_directory, inserted_filename):
         self.cu.execute(self.SQL_UPDATE_FILE_WITH_IS_DELETED, (inserted_directory, inserted_filename, file_hash))
 
+    def get_filepath(self, file_hash):
+        _, existed_directory, existed_filename, _1 = self.cu.execute(self.SQL_SELECT_FILE, (file_hash,)).fetchone()
+        return f'{existed_directory}/{existed_filename}' if existed_directory else existed_filename
+
 
 class LibraryStorage:
     CSV_COUNT_ROWS_ON_PAGE = 100
@@ -203,15 +207,15 @@ class LibraryStorage:
                         # обнаружен дубликат с тем же именем - всё нормально, это один и тот же файл
                         self.db.set_is_not_deleted(file_hash)
                     else:
-                        if not os.path.exists(existed_path):
-                            # первоначального файла не существует, что означиет, что дубликат - это переименованый файл
-                            self.db.update(file_hash, inserted_directory, inserted_filename)
-                        else:
+                        if os.path.exists(existed_path):
                             # обнаружен дубликат с отличающимся именем и существующим первоначальным файлом -
                             # - уведомляем об этом, чтобы пользователь мог удалить один из них
                             print(self.MESSAGE_DOUBLE.format(existed_path, inserted_path))
                             if func_dublicate:
-                                func_dublicate(existed_path, inserted_path)
+                                func_dublicate(existed_path, inserted_path, file_hash)
+                        else:
+                            # первоначального файла не существует, что означает, что дубликат - это переименованый файл
+                            self.db.update(file_hash, inserted_directory, inserted_filename)
                 elif process_dublicate == 'copy':
                     # игнорируем любые дубликаты - они из копии в оригинал не попадут
                     if is_deleted:
