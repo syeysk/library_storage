@@ -96,32 +96,50 @@ class ScanWindow:
     def build_button_delete_dublicate_file(master, viewed_filepath, command):
         frame = Frame(master)
         frame.pack(anchor=W)
-        button = Button(frame, text='Удалить', command=command)
+        button = Button(frame, text='Удалить')
+        button.configure(command=lambda: command(button.winfo_id()))
         button.pack(side=LEFT)
         Label(frame, text=viewed_filepath).pack(side=LEFT)
         return button
 
     def add_dublicate_file_frame(self, existed_filepath, inserted_filepath, file_hash):
-        def delete_inserted_file():
-            remove(inserted_filepath)
-            #button_existed.state(['!active', 'disabled'])
-            button_inserted.state(['!active', 'disabled'])
+        def delete_file(winfo_id):
+            button = self.dublicate_frames[file_hash]['buttons'][winfo_id]
+            if winfo_id == self.dublicate_frames[file_hash]['button_existed']:
+                filepath = self.lib_storage.db.get_filepath(file_hash)
+                del self.dublicate_frames[file_hash]['buttons'][winfo_id]
+                del self.dublicate_frames[file_hash]['paths'][winfo_id]
+                new_winfo_id = list(self.dublicate_frames[file_hash]['buttons'].keys())[0]
+                new_filepath = self.dublicate_frames[file_hash]['paths'][new_winfo_id]
+                self.dublicate_frames[file_hash]['button_existed'] = new_winfo_id
+                self.lib_storage.db.update(file_hash, dirname(new_filepath), basename(new_filepath))
+            else:
+                filepath = self.dublicate_frames[file_hash]['paths'][winfo_id]
+                del self.dublicate_frames[file_hash]['buttons'][winfo_id]
+                del self.dublicate_frames[file_hash]['paths'][winfo_id]
 
-        def delete_existed_file():
-            actual_filepath = self.lib_storage.db.get_filepath(file_hash)
-            self.lib_storage.db.update(file_hash, dirname(inserted_filepath), basename(inserted_filepath))
-            remove(actual_filepath)
-            button_existed.state(['!active', 'disabled'])
-            #button_inserted.state(['!active', 'disabled'])
+            remove(filepath)
+            button.state(['!active', 'disabled'])
+            button.configure(text='удалён')
 
-        frame = self.dublicate_frames.get(file_hash)
-        if not frame:
+            if len(self.dublicate_frames[file_hash]['buttons']) == 1:
+                single_winfo_id, single_button = list(self.dublicate_frames[file_hash]['buttons'].items())[0]
+                single_button.state(['!active', 'disabled'])
+                single_button.configure(text='единственный')
+
+        double_dict = self.dublicate_frames.setdefault(file_hash, {})
+        if not double_dict:
             frame = LabelFrame(self.frame_dublicates, text=file_hash, relief=GROOVE, borderwidth=2, padx=10, pady=5)
             frame.pack(fill=X)
-            self.dublicate_frames[file_hash] = frame
-            button_existed = self.build_button_delete_dublicate_file(frame, existed_filepath, delete_existed_file)
+            button = self.build_button_delete_dublicate_file(frame, existed_filepath, delete_file)
+            double_dict['button_existed'] = button.winfo_id()
+            double_dict['frame'] = frame
+            double_dict['buttons'] = {button.winfo_id(): button}
+            double_dict['paths'] = {button.winfo_id(): existed_filepath}
 
-        button_inserted = self.build_button_delete_dublicate_file(frame, inserted_filepath, delete_inserted_file)
+        button = self.build_button_delete_dublicate_file(double_dict['frame'], inserted_filepath, delete_file)
+        double_dict['buttons'][button.winfo_id()] = button
+        double_dict['paths'][button.winfo_id()] = inserted_filepath
 
     def progress_count_scanned_files(self, total_scanned_files):
         self.parent_window.variable_count_scanned_files.set(total_scanned_files)
