@@ -33,7 +33,7 @@ class DBStorage:
     SQL_INSERT_ROW = 'INSERT INTO files (hash, directory, filename) VALUES (?, ?, ?)'
     SQL_INSERT_ROW_WITH_ID = 'INSERT INTO files (hash, id, directory, filename) VALUES (?, ?, ?, ?)'
     SQL_SELECT_FILE = 'SELECT id, directory, filename, is_deleted FROM files WHERE hash=?'
-    SQL_SELECT_COUNT_ROWS = 'SELECT COUNT(id) FROM files'
+    SQL_SELECT_COUNT_ROWS = 'SELECT COUNT(id) FROM files WHERE is_deleted = 0'
     SQL_SELECT_ROWS = 'SELECT hash, id, directory, filename FROM files WHERE is_deleted = 0 LIMIT ?,?'
     SQL_SELECT_ROWS_ONLY_DELETED = 'SELECT hash, id, directory, filename FROM files WHERE is_deleted=1 LIMIT ?,?'
     SQL_CREATE_TABLE = '''
@@ -263,7 +263,7 @@ class LibraryStorage:
         index_of_current_row = None
         for index_of_current_row, row in enumerate(self.db.select_rows()):
             number_of_last_row_on_current_page = number_of_last_row_on_current_page - row[1] + 1
-            if index_of_current_row == number_of_last_row_on_current_page:
+            if index_of_current_row >= number_of_last_row_on_current_page:
                 exporter.close(is_last_page=index_of_current_row == count_rows - 1)
                 number_of_last_row_on_current_page += self.CSV_COUNT_ROWS_ON_PAGE
                 csv_current_page += 1
