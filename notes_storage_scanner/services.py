@@ -91,15 +91,68 @@ class DevelopsocService(BaseService):
         return {}
 
 
-class KnowledgeService(BaseService):
-    SERVICE_NAME = 'knowledge'
+# class KnowledgeService(BaseService):
+#     SERVICE_NAME = 'knowledge'
+#
+#     def __init__(self, **kwargs):
+#         super(KnowledgeService, self).__init__(**kwargs)
+#
+#     def create_note(self):
+#         return {'id': 'article_name', 'url': 'https://github.com/article_name', 'publicate_datetime': '2022-09-12 23:10'}
+#
+#     def update_note(self, note_id):
+#         print('----', self._password)
+#         return {}
+
+
+KNOWLEDGE_OWNER = 'TVP-Support'
+KNOWLEDGE_REPO = 'activista'
+OWNER = ''
+TOKEN = ''
+
+
+class ServiceGithub:
+    """Имя форка должно соответствать оригиналу, форк должен быть прямым потомком оригинала"""
+    url_template = 'https://api.github.com{}'
+    SERVICE_NAME = 'knowledge_github'
 
     def __init__(self, **kwargs):
-        super(KnowledgeService, self).__init__(**kwargs)
+        super(ServiceGithub, self).__init__(**kwargs)
+        self.knowledge_owner = KNOWLEDGE_OWNER
+        self.knowledge_repo = KNOWLEDGE_REPO
+        self.owner = OWNER
+        self.headers = {
+            'accepts': 'application/vnd.github+json',
+        }
+
+    def get_url(self, url_path):
+        return self.url_template.format(url_path)
+
+    def has_fork(self):
+        url = self.get_url(f'/repos/{self.owner}/{self.knowledge_repo}')
+        response = requests.get(url, headers=self.headers)
+        if response.status_code == 200:
+            data = response.json()
+            if data['fork']:
+                parent = data['parent']
+                if parent and parent['full_name'] == f'{self.knowledge_owner}/{self.knowledge_repo}':
+                    return True
+
+        #raise Exception('The repo is not fork of original repo.')
+
+    def make_fork(self):
+        url = self.get_url(f'/repos/{self.knowledge_owner}/{self.knowledge_repo}/forks')
+        data = {'default_branch_only': True}
+        response = requests.post(url, headers=self.headers, data=data, timeout=60*5)
+        if response.status_code != 202:
+            raise Exception('Error to make fork')
 
     def create_note(self):
-        return {'id': 'article_name', 'url': 'https://github.com/article_name', 'publicate_datetime': '2022-09-12 23:10'}
+        if not self.has_fork():
+            self.make_fork()
+            self.make_branch()
+        else:
+            if not self.has_branch():
+                self.make_branch()
 
-    def update_note(self, note_id):
-        print('----', self._password)
-        return {}
+        # do commit, push, making PR, setting reviewers.
