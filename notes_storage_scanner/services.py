@@ -1,8 +1,10 @@
 import requests
+import base64
+
 from pykeepass import PyKeePass
 from pykeepass.exceptions import CredentialsError
 
-from constants_paths import DEFAULT_PASSWORD_FILEPATH
+from constants import DEFAULT_PASSWORD_FILEPATH, GITHUB_KNOWLEDGE_OWNER, GITHUB_KNOWLEDGE_REPO
 
 
 def get_password_data(
@@ -28,7 +30,7 @@ def get_password_data(
 class BaseService:
     SERVICE_NAME = None
 
-    def __init__(self, title, body, password_filepath=DEFAULT_PASSWORD_FILEPATH, password=''):
+    def __init__(self, title, body, password_filepath='DEFAULT_PASSWORD_FILEPATH', password=''):
         self.title = title
         self.body = body
         self._password_filepath = password_filepath
@@ -56,7 +58,7 @@ class SyeyskService(BaseService):
 
         parts = self.body.split('\n', 1)
         self.cut = parts[0] if parts else ''
-        self.body = parts[1] if len(parts) > 1else self.cut
+        self.body = parts[1] if len(parts) > 1 else self.cut
 
     def create_note(self):
         data = {'title': self.title, 'content': self.body, 'cut': self.cut}
@@ -85,39 +87,36 @@ class DevelopsocService(BaseService):
 
     def create_note(self):
         print('----', self._password)
-        return {'id': 'article_name', 'url': 'https://developsoc.ru/article_name', 'publicate_datetime': '2022-09-12 23:10'}
+        return {'id': 'article_name', 'url': 'https://developsoc.ru/article_name',
+                'publicate_datetime': '2022-09-12 23:10'}
 
     def update_note(self, note_id):
         return {}
 
 
-KNOWLEDGE_OWNER = 'TVP-Support'
-KNOWLEDGE_REPO = 'knowledge'
-OWNER = 'shyzik93'
-TOKEN = ''
-
-
-class ServiceGithub(BaseService):
-    """Имя форка должно соответствать оригиналу, форк должен быть прямым потомком оригинала"""
+class GithubService(BaseService):
+    """Имя форка должно соответствовать оригиналу, форк должен быть прямым потомком оригинала"""
     url_template = 'https://api.github.com{}'
     SERVICE_NAME = 'knowledge_github'
 
     def __init__(self, **kwargs):
-        super(ServiceGithub, self).__init__(**kwargs)
-        self.knowledge_owner = KNOWLEDGE_OWNER
-        self.knowledge_repo = KNOWLEDGE_REPO
-        self.owner = OWNER
-        self.branch = 'notes_from_extern_service'
-        self.headers = {
-            'accepts': 'application/vnd.github+json',
-        }
+        super(GithubService, self).__init__(**kwargs)
+        self.knowledge_owner = GITHUB_KNOWLEDGE_OWNER
+        self.knowledge_repo = GITHUB_KNOWLEDGE_REPO
+        password_data = self.get_password_data()
+        self.token = password_data.password
+        self.owner = password_data.username
+        self.branch = 'notes-from-extern-service'
+        self.headers = {'Accepts': 'application/vnd.github+json'}
+        self.auth = (self.owner, self.token)
 
     def get_url(self, url_path):
         return self.url_template.format(url_path)
 
     def has_fork(self):
         url = self.get_url(f'/repos/{self.owner}/{self.knowledge_repo}')
-        response = requests.get(url, headers=self.headers)
+        response = requests.get(url, auth=self.auth, headers=self.headers)
+        # print('has_fork()', url, response.text, response.status_code)
         if response.status_code == 200:
             data = response.json()
             if data['fork']:
@@ -128,65 +127,88 @@ class ServiceGithub(BaseService):
     def make_fork(self):
         url = self.get_url(f'/repos/{self.knowledge_owner}/{self.knowledge_repo}/forks')
         data = {'default_branch_only': True}
-        response = requests.post(url, headers=self.headers, data=data, timeout=60*5)
+        response = requests.post(url, auth=self.auth, headers=self.headers, json=data, timeout=60 * 5)
+        print('make_fork()', url, response.text, response.status_code)
         if response.status_code != 202:
-            raise Exception('Error to make fork')
+            raise Exception('Error to make fork', response.text)
 
     def has_branch(self):
-        url = self.get_url(f'/repos/{self.owner}/{self.knowledge_repo}/branches/{self.branch}')
-        response = requests.head(url, headers=self.headers)
+        url = self.get_url(f'/repos/{self.owner}/{self.knowledge_repo}/git/ref/heads/{self.branch}')
+        response = requests.get(url, auth=self.auth, headers=self.headers)
         if response.status_code == 200:
             return True
 
+        print('has_branch()', url, response.text, response.status_code)
+
+    '''
     def get_last_commit_hash(self):
         url = self.get_url(f'/repos/{self.owner}/{self.knowledge_repo}/commits')
         response = requests.get(url, params={'per_page': 1}, headers=self.headers)
         if response.status_code == 200:
             return response.json()[0]['sha']
 
-        raise Exception('Error getting last commit\'s sh1')
+        raise Exception('Error getting last commit\'s sh1', response.text)
+    '''
 
-    def make_branch(self, sha1):
+    def get_head_branch_hash(self):
+        url = self.get_url(f'/repos/{self.owner}/{self.knowledge_repo}/git/ref/heads/main')
+        response = requests.get(url, auth=self.auth, headers=self.headers)
+        print('get_head_branch_hash()', url, response.text, response.status_code)
+        if response.status_code == 200:
+            return response.json()['object']['sha']
+
+        raise Exception('Error getting head branch\'s sha', response.text)
+
+    def make_branch(self, sha):
         url = self.get_url(f'/repos/{self.owner}/{self.knowledge_repo}/git/refs')
         data = {
             'ref': f'refs/heads/{self.branch}',
-            'sha1': sha1,
+            'sha': sha,
         }
-        response = requests.post(url, headers=self.headers, data=data)
+        response = requests.post(url, json=data, auth=self.auth, headers=self.headers)
+        print('make_branch()', url, response.text, response.status_code, data)
         if response.status_code != 201:
-            raise Exception('Error to make branch')
+            raise Exception('Error to make branch', response.text, response.status_code)
 
     def get_last_pull_request_id(self):
         url = self.get_url(f'/repos/{self.owner}/{self.knowledge_repo}/pulls')
         params = {'per_page': 1, 'head': f'{self.owner}:{self.branch}', 'state': 'open'}
-        response = requests.get(url, params=params, headers=self.headers)
+        response = requests.get(url, auth=self.auth, params=params, headers=self.headers)
         if response.status_code == 200:
-            return response.json()[0]['id']
+            pull_requests = response.json()
+            return pull_requests[0]['id'] if pull_requests else False
+
+        raise Exception('Error getting last Pull Request')
 
     def make_pull_request(self):
         url = self.get_url(f'/repos/{self.owner}/{self.knowledge_repo}/pulls')
         data = {
             'title': 'The Pull Request from extern app',
             'head': f'{self.owner}:{self.branch}',
-            'state': f'{self.knowledge_owner}:master',
+            'base': f'main',
+            'body': 'This PR was created by external app.'
         }
-        response = requests.post(url, data=data, headers=self.headers)
+        response = requests.post(url, auth=self.auth, json=data, headers=self.headers)
         if response.status_code == 201:
             return response.json()['id']
 
-        raise Exception('Error make Pull Request')
+        raise Exception('Error make Pull Request', response.status_code, response.text)
 
-    def send_file(self, file_path, file_content, sha=None):
+    def send_file(self, file_path: str, file_content: bytes, sha=None):
         url = self.get_url(f'/repos/{self.owner}/{self.knowledge_repo}/contents/{file_path}')
-        data = {'branch': self.branch, 'message': '', 'content': file_content}
+        data = {
+            'branch': self.branch,
+            'message': 'update file from external app',
+            'content': str(base64.b64encode(file_content), 'utf-8')
+        }
         if sha:
             data['sha'] = sha
 
-        response = requests.put(url, data=data, headers=self.headers)
+        response = requests.put(url, auth=self.auth, json=data, headers=self.headers)
         if (sha and response.status_code == 200) or (not sha and response.status_code == 201):
             return True
 
-        raise Exception('Error create or update file')
+        raise Exception('Error create or update file', response.text)
 
     def create_note(self):
         created = False
@@ -195,12 +217,13 @@ class ServiceGithub(BaseService):
             created = True
 
         if created or not self.has_branch():
-            sha1 = self.get_last_commit_hash()
-            self.make_branch(sha1)
+            sha = self.get_head_branch_hash()
+            self.make_branch(sha)
             created = True
 
-        last_pull_requst_id = self.get_last_pull_request_id()
-        if created or not last_pull_requst_id:
-            self.make_pull_request()
+        # self.send_file(file_path=self.file_path, file_content=self.raw_content)
+        self.send_file(file_path=self.title, file_content=bytes(self.body, 'utf-8'))
 
-        self.send_file(file_path=self.file_path, file_content=self.raw_content)
+        # last_pull_requst_id = self.get_last_pull_request_id()
+        # if created or not last_pull_requst_id:
+        #     self.make_pull_request()

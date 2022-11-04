@@ -3,7 +3,7 @@ from os.path import basename, dirname
 from tkinter import (GROOVE, LEFT, TOP, Frame, LabelFrame, StringVar, IntVar, W, filedialog, Toplevel, BOTH, X, Y)
 from tkinter.ttk import Button, Label, Separator, Notebook
 
-from constants_paths import DEFAULT_LIBRARY_DIRPATH, DEFAULT_LIBRARY_STRUCTURE_DIRPATH
+from constants import DEFAULT_LIBRARY_DIRPATH, DEFAULT_LIBRARY_STRUCTURE_DIRPATH
 from library_storage_scanner.exporters import CSVExporter, MarkdownExporter
 from library_storage_scanner.scanner import DBStorage, LibraryStorage
 from utils_gui import BasicGUI, build_scrollable_frame

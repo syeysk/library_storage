@@ -5,7 +5,7 @@ import sqlite3
 import zipfile
 from io import TextIOWrapper, StringIO
 
-from constants_paths import LIBRARY_IGNORE_EXTENSIONS
+from constants import LIBRARY_IGNORE_EXTENSIONS
 
 STATUS_NEW = 'Новый'
 STATUS_MOVED = 'Переместили'

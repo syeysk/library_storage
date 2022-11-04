@@ -3,7 +3,7 @@ from tkinter import (GROOVE, LEFT, RIGHT, Frame, LabelFrame, StringVar, W, SE, f
                      BOTH, X, Entry)
 from tkinter.ttk import Button, Label, Notebook
 
-from constants_paths import DEFAULT_NOTES_DIRPATH, DEFAULT_PASSWORD_FILEPATH
+from constants import DEFAULT_NOTES_DIRPATH, DEFAULT_PASSWORD_FILEPATH
 from notes_storage_scanner.scanner import scan_knowlege
 from utils_gui import BasicGUI, build_scrollable_frame
 
@@ -35,6 +35,10 @@ class GUI(BasicGUI):
 
     def build_publication_subcard(self, service_name, card_frame, note):
         service_data = note.meta['publicate_to'][service_name]
+        if service_data is None:
+            service_data = {}
+            note.meta['publicate_to'][service_name] = service_data
+
         service_frame = LabelFrame(card_frame, text=service_name)
         service_frame.pack(anchor=W, fill=X)
 

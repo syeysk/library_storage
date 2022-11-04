@@ -33,13 +33,13 @@ import time
 
 import yaml
 
-from constants_paths import DEFAULT_NOTES_DIRPATH, DEFAULT_PASSWORD_FILEPATH
-from notes_storage_scanner.services import SyeyskService, KnowledgeService, DevelopsocService
+from constants import DEFAULT_NOTES_DIRPATH, DEFAULT_PASSWORD_FILEPATH
+from notes_storage_scanner.services import SyeyskService, GithubService, DevelopsocService
 
 SERVICES = {
-    'syesyk': SyeyskService,
-    'developsoc': DevelopsocService,
-    'knowledge': KnowledgeService,
+    SyeyskService.SERVICE_NAME: SyeyskService,
+    DevelopsocService.SERVICE_NAME: DevelopsocService,
+    GithubService.SERVICE_NAME: GithubService,
 }
 IGNORE_PATHS = [
     os.path.normpath(f'{DEFAULT_NOTES_DIRPATH}/.obsidian'),
