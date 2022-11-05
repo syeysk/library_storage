@@ -107,6 +107,7 @@ class GithubService(BaseService):
         self.token = password_data.password
         self.owner = password_data.username
         self.branch = 'notes-from-extern-service'
+        self.prefix_filepath = 'db/'
         self.headers = {'Accepts': 'application/vnd.github+json'}
         self.auth = (self.owner, self.token)
 
@@ -198,7 +199,7 @@ class GithubService(BaseService):
         url = self.get_url(f'/repos/{self.owner}/{self.knowledge_repo}/contents/{file_path}')
         data = {
             'branch': self.branch,
-            'message': 'update file from external app',
+            'message': '{} file from external app'.format('update' if sha else 'add'),
             'content': str(base64.b64encode(file_content), 'utf-8')
         }
         if sha:
@@ -206,24 +207,32 @@ class GithubService(BaseService):
 
         response = requests.put(url, auth=self.auth, json=data, headers=self.headers)
         if (sha and response.status_code == 200) or (not sha and response.status_code == 201):
-            return True
+            return response.json()
 
-        raise Exception('Error create or update file', response.text)
+        raise Exception('Error create or update file', response.status_code, response.text)
 
     def create_note(self):
-        created = False
-        if not self.has_fork():
-            self.make_fork()
-            created = True
+        try:
+            created = False
+            if not self.has_fork():
+                self.make_fork()
+                created = True
 
-        if created or not self.has_branch():
-            sha = self.get_head_branch_hash()
-            self.make_branch(sha)
-            created = True
+            if created or not self.has_branch():
+                sha = self.get_head_branch_hash()
+                self.make_branch(sha)
+                created = True
 
-        # self.send_file(file_path=self.file_path, file_content=self.raw_content)
-        self.send_file(file_path=self.title, file_content=bytes(self.body, 'utf-8'))
+            file_path = f'{self.prefix_filepath}{self.title}.md'
+            file_data = self.send_file(file_path=file_path, file_content=bytes(self.body, 'utf-8'))
 
-        # last_pull_requst_id = self.get_last_pull_request_id()
-        # if created or not last_pull_requst_id:
-        #     self.make_pull_request()
+            # last_pull_requst_id = self.get_last_pull_request_id()
+            # if created or not last_pull_requst_id:
+            #     self.make_pull_request()
+
+            #url = f'https://github.com/{self.owner}/{self.knowledge_repo}/blob/{self.branch}/{file_path}'
+            return True, {'id': file_data['content']['sha'], 'url': file_data['content']['html_url']}
+        except Exception as error:
+            error_str = str(error)
+            return False, error_str
+

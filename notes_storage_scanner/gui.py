@@ -75,7 +75,6 @@ class GUI(BasicGUI):
 
             # TODO: кнопка должна сохранять данные только конкретного сервиса, храня его отдельно и при сохранении добавляя к обще метаинформации
             button_save = Button(frame_buttons, text='Сохранить', command=lambda: self.save(service_name, note))
-            button_save.pack(side=RIGHT, anchor=SE)
             button_save.state(['!active', 'disabled'])
             custom_data['button_save'] = button_save
 
@@ -84,8 +83,10 @@ class GUI(BasicGUI):
                 text=text_of_button,
                 command=lambda: self.publicate_to(service_name, note)
             )
-            button_publicate.pack(side=RIGHT, anchor=SE)
             custom_data['button_publicate'] = button_publicate
+
+            button_publicate.pack(side=LEFT, anchor=SE)
+            button_save.pack(side=LEFT, anchor=SE)
 
     def scan_knowledge(self):
         def logger_action(name, data):

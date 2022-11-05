@@ -96,7 +96,7 @@ class Note:
                     indent=4,
                     width=70,
                 )
-                file_note.write('{}\n---\n\n'.format(yaml_str[:-2]))
+                file_note.write('{}\n---\n\n'.format(yaml_str[:-1]))
                 file_note.write('# {}\n\n'.format(self.title))
                 file_note.write('{}\n'.format(self.body))
         except Exception as error:
