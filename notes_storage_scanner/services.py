@@ -224,7 +224,8 @@ class GithubService(BaseService):
                 created = True
 
             file_path = f'{self.prefix_filepath}{self.title}.md'
-            file_data = self.send_file(file_path=file_path, file_content=bytes(self.body, 'utf-8'))
+            file_content = bytes(f'#{self.title}\n\n{self.body}\n', 'utf-8')
+            file_data = self.send_file(file_path=file_path, file_content=file_content)
 
             # last_pull_requst_id = self.get_last_pull_request_id()
             # if created or not last_pull_requst_id:
