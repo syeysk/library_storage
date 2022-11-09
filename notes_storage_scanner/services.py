@@ -1,5 +1,6 @@
 import requests
 import base64
+from typing import Optional
 
 from pykeepass import PyKeePass
 from pykeepass.exceptions import CredentialsError
@@ -95,7 +96,14 @@ class DevelopsocService(BaseService):
 
 
 class GithubService(BaseService):
-    """Имя форка должно соответствовать оригиналу, форк должен быть прямым потомком оригинала"""
+    """
+    Имя форка должно соответствовать оригиналу, форк должен быть прямым потомком оригинала.
+    Алгоритм добавления заметки на гитхаб:
+    1. Если файл-заметка не существует, то она загрукзится на гитхаб.
+    2. Если файл-заметка существует и это действительно файл (а не ссылка, директория и пр.), то сперва будет выведено предупреждение. После повторной попытки файл обновится.
+    Алгоритм обновления заметки на гитхаб:
+    1. Файл-заметка будет обновлён принудительно.
+    """
     url_template = 'https://api.github.com{}'
     SERVICE_NAME = 'knowledge_github'
 
@@ -110,6 +118,7 @@ class GithubService(BaseService):
         self.prefix_filepath = 'db/'
         self.headers = {'Accepts': 'application/vnd.github+json'}
         self.auth = (self.owner, self.token)
+        self.first_trying = True
 
     def get_url(self, url_path):
         return self.url_template.format(url_path)
@@ -211,6 +220,37 @@ class GithubService(BaseService):
 
         raise Exception('Error create or update file', response.status_code, response.text)
 
+    def check_file_existing(self, file_path) -> Optional[str]:
+        url = self.get_url(f'/repos/{self.owner}/{self.knowledge_repo}/contents/{file_path}')
+        params = {'ref': f'{self.branch}'}
+        response = requests.get(url, auth=self.auth, params=params, headers=self.headers)
+        print('check_file_existing()', url, response.text, response.status_code)
+
+        if response.status_code == 404:
+            return
+
+        if response.status_code != 200:
+            raise Exception('Error checking file:', response.status_code, response.text)
+
+        file_data = response.json()
+        if file_data['type'] != 'file':
+            raise Exception('File exist not like a file:', response.text)
+
+        if self.first_trying:
+            self.first_trying = False
+            raise Exception(
+                'Заметка с таким именем уже существует. '
+                'Переименуйте заметку и перезапустите сканирование либо принудительно обновите заметку, '
+                'повторно нажав на кнопку "Опубликовать".'
+            )
+
+        return file_data['sha']
+
+    def build_note_parts(self):
+        file_path = f'{self.prefix_filepath}{self.title}.md'
+        file_content = bytes(f'# {self.title}\n\n{self.body}\n', 'utf-8')
+        return file_path, file_content
+
     def create_note(self):
         try:
             created = False
@@ -219,13 +259,13 @@ class GithubService(BaseService):
                 created = True
 
             if created or not self.has_branch():
-                sha = self.get_head_branch_hash()
-                self.make_branch(sha)
+                sha_of_branch = self.get_head_branch_hash()
+                self.make_branch(sha_of_branch)
                 created = True
 
-            file_path = f'{self.prefix_filepath}{self.title}.md'
-            file_content = bytes(f'#{self.title}\n\n{self.body}\n', 'utf-8')
-            file_data = self.send_file(file_path=file_path, file_content=file_content)
+            file_path, file_content = self.build_note_parts()
+            sha_of_existing_file = self.check_file_existing(file_path)
+            file_data = self.send_file(file_path=file_path, file_content=file_content, sha=sha_of_existing_file)
 
             # last_pull_requst_id = self.get_last_pull_request_id()
             # if created or not last_pull_requst_id:
@@ -237,3 +277,13 @@ class GithubService(BaseService):
             error_str = str(error)
             return False, error_str
 
+    def update_note(self, note_id):
+        """
+        :param note_id: sha
+        """
+        try:
+            file_path, file_content = self.build_note_parts()
+            file_data = self.send_file(file_path=file_path, file_content=file_content, sha=note_id)
+            return True, {'url': file_data['content']['html_url']}
+        except Exception:
+            return False,
