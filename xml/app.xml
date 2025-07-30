@@ -1,0 +1,32 @@
+<?xml version="1.1" encoding="UTF-8" ?>
+<Box spacing="6" margin_top="6" margin_start="6" margin_end="6" margin_bottom="6" orientation="HORIZONTAL">
+    <Box spacing="6" margin_top="6" margin_start="6" margin_end="6" margin_bottom="6">
+    	<Button id="button_scan">Сканировать</Button>
+	    <Grid>
+		    <Row>
+        	    <Button id="button_change_storage_books" colspan="1">✏️</Button>
+        	    <Label colspan="3">Хранилище:</Label>
+		    </Row>
+		</Grid>
+		<ScrolledWindow id="scrolled_tags">
+			<Box id="tags">
+			</Box>
+		</ScrolledWindow>
+		<Box>
+    	    <Button id="button_export">Экспортировать в заметки</Button>
+	        <Button id="button_import">Импортировать из заметок</Button>
+			<Grid>
+				<Row>
+					<Button id="button_change_storage_nnotes" colspan="1">✏️</Button>
+					<Label colspan="3">Заметки:</Label>
+				</Row>
+			</Grid>
+		</Box>
+    </Box>
+    <Box>
+		<ScrolledWindow id="scrolled_books">
+			<Box id="books">
+			</Box>
+		</ScrolledWindow>
+	</Box>
+</Box>

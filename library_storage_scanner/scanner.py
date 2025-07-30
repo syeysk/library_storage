@@ -4,6 +4,7 @@ import os
 import sqlite3
 import zipfile
 from io import TextIOWrapper, StringIO
+from pathlib import Path
 
 from constants import LIBRARY_IGNORE_EXTENSIONS
 
@@ -50,7 +51,7 @@ class DBStorage:
     SQL_UPDATE_FILE_WITH_IS_DELETED = 'UPDATE files SET is_deleted=0, directory=?, filename=? WHERE hash=?'
     SQL_UPDATE_FILE = 'UPDATE files SET directory=?, filename=? WHERE hash=?'
 
-    def __init__(self, db_path: str) -> None:
+    def __init__(self, db_path: Path) -> None:
         self.db_path = db_path
         self.c = sqlite3.connect(db_path)
         self.cu = self.c.cursor()
@@ -138,7 +139,7 @@ class DBStorage:
         for file_hash, file_id, existed_directory, existed_filename in self.select_rows(only_deleted=True):
             existed_path = '{}/{}'.format(existed_directory, existed_filename)  # .removeprefix('/')
             existed_path = existed_path[1:] if existed_path.startswith('/') else existed_path
-            func((STATUS_DELETED, existed_path, None, file_hash, file_id))
+            func(STATUS_DELETED, existed_path, None, file_hash, file_id)
 
     def delete_file(self, file_hash):
         self.cu.execute(self.SQL_DELETE_FILE, (file_hash, ))
@@ -192,15 +193,21 @@ class LibraryStorage:
 
     def scan_to_db(
             self,
-            library_path,
+            library_path: Path,
             process_dublicate,
             progress_count_scanned_files=None,
             func_dublicate=None,
     ):
         """Сканирует информацию о файлах в директории и заносит её в базу"""
-        def process_file_status(*args):
-            status, existed_path, inserted_path = self.get_file_status(*args[:5])
-            inserted_directory, inserted_filename, is_exists, _, _1, file_hash, file_id, is_deleted = args
+        def process_file_status(inserted_directory,
+                    inserted_filename,
+                    is_exists,
+                    existed_directory,
+                    existed_filename,
+                    file_hash,
+                    file_id,
+                    is_deleted,):
+            status, existed_path, inserted_path = self.get_file_status(inserted_directory, inserted_filename, is_exists, existed_directory, existed_filename)
             if is_exists:
                 if process_dublicate == 'original':
                     if status == STATUS_UNTOUCHED:
@@ -250,6 +257,7 @@ class LibraryStorage:
 
         self.db.insert_rows(with_id=False, func=process_file_status)
         # print('Обнаружено файлов:', total_count_files, 'шт')
+        #self.db.print_deleted_files(process_file_status)
 
     def export_db_to_csv(self, exporter, progress_count_exported_files=None) -> None:
         """

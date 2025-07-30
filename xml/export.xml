@@ -1,0 +1,15 @@
+<?xml version="1.1" encoding="UTF-8" ?>
+<Grid margin_top="6" margin_start="6" margin_end="6" margin_bottom="6">
+	<Row>
+	    <Label>Всего книг:</Label>
+		<Label id="count_rows">0</Label>
+	</Row>
+	<Row>
+	    <Label>Экспортировано книг:</Label>
+		<Label id="index_of_current_row">0</Label>
+	</Row>
+	<Row>
+	    <Label>Создано страниц-заметок:</Label>
+		<Label id="current_page">0</Label>
+	</Row>
+</Grid>

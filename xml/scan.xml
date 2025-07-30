@@ -1,0 +1,19 @@
+<?xml version="1.1" encoding="UTF-8" ?>
+<Box spacing="6" margin_top="6" margin_start="6" margin_end="6" margin_bottom="6">
+	<ScrolledWindow id="scrolled_books">
+		<Box>
+			<Box orientation="HORIZONTAL">
+				<Label>Сканировано:</Label>
+				<Label id="count_scanned_files">0</Label>
+			</Box>
+			<Box orientation="HORIZONTAL">
+				<Label>Новые:</Label>
+				<Label>0</Label>
+			</Box>
+	    </Box>
+	</ScrolledWindow>
+	<ScrolledWindow id="scrolled_books">
+		<Box id="books">
+		</Box>
+	</ScrolledWindow>
+</Box>
