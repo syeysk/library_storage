@@ -6,14 +6,13 @@ import zipfile
 from io import TextIOWrapper, StringIO
 from pathlib import Path
 
-from constants import LIBRARY_IGNORE_EXTENSIONS
-
 STATUS_NEW = 'Новый'
 STATUS_MOVED = 'Переместили'
 STATUS_RENAMED = 'Переименовали'
 STATUS_MOVED_AND_RENAMED = 'Переместили и переименовали'
 STATUS_UNTOUCHED = 'Не тронут'
 STATUS_DELETED = 'Удалён'
+LIBRARY_IGNORE_EXTENSIONS = ['mp3', 'db']
 
 
 def get_file_hash(file_path):

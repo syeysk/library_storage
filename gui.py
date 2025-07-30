@@ -6,7 +6,7 @@ import gi
 gi.require_version('Gtk', '4.0')
 from gi.repository import GLib, Gio, Gtk, GObject, Gdk
 
-from window_builder import WindowBuilder
+from library_storage_scanner.window_builder import WindowBuilder
 from library_storage_scanner.scanner import DBStorage, LibraryStorage
 from library_storage_scanner.exporters import MarkdownExporter
 
