@@ -2,6 +2,7 @@
 <Box spacing="6" margin_top="6" margin_start="6" margin_end="6" margin_bottom="6" orientation="HORIZONTAL">
     <Box spacing="6" margin_top="6" margin_start="6" margin_end="6" margin_bottom="6">
     	<Button id="button_scan">Сканировать</Button>
+    	<Button id="button_scan_extern">Сканировать внешнее</Button>
 	    <Grid>
 		    <Row>
         	    <Button id="button_change_storage_books" colspan="1">✏️</Button>

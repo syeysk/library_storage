@@ -268,6 +268,7 @@ class AppWindow(Gtk.ApplicationWindow):
         #self.add_action(action_show_map)
 
         self.builder.button_scan.connect('clicked', self.on_scan)
+        self.builder.button_scan_extern.connect('clicked', self.on_scan_extern)
         self.builder.button_export.connect('clicked', self.on_export)
         self.config = Config()
         self.config.set_storage_books(Path('example_library_changed').resolve())#('A://Книги')
@@ -293,6 +294,11 @@ class AppWindow(Gtk.ApplicationWindow):
             self.book_list.append(book_id, Path(directory) / filename)
 
     def on_scan(self, action):
+        window = ScanWindow(self.config, self.lib_storage, transient_for=self, title='Сканирование', modal=True)
+        window.present()
+
+    def on_scan_extern(self, action):
+        # TODO: открываем окно для выбора внешнего хранилища и только потом открываем окно
         window = ScanWindow(self.config, self.lib_storage, transient_for=self, title='Сканирование', modal=True)
         window.present()
 
