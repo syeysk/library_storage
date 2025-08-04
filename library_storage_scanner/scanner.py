@@ -43,12 +43,33 @@ class DBStorage:
             directory VARCHAR(255),
             filename VARCHAR(255),
             is_deleted INT NOT NULL DEFAULT 0
+        );
+        CREATE TABLE IF NOT EXISTS tags (
+            id INTEGER PRIMARY KEY,
+            name VARCHAR(255),
+            parent INTEGER DEFAULT NULL
         );'''
     SQL_DELETE_FILE = 'DELETE FROM files WHERE hash=?'
     SQL_UPDATE_SET_IS_DELETED_FOR_ALL = 'UPDATE files SET is_deleted=1'
     SQL_UPDATE_SET_IS_DELETED = 'UPDATE files SET is_deleted=0 WHERE hash=?'
     SQL_UPDATE_FILE_WITH_IS_DELETED = 'UPDATE files SET is_deleted=0, directory=?, filename=? WHERE hash=?'
     SQL_UPDATE_FILE = 'UPDATE files SET directory=?, filename=? WHERE hash=?'
+
+    SQL_INSERT_TAG = 'INSERT INTO tags (name, parent) VALUES (?, ?)'
+    SQL_SELECT_TAGS = 'SELECT id, name FROM tags WHERE parent=?'
+    SQL_SELECT_TAGS_NULL = 'SELECT id, name FROM tags WHERE parent IS NULL'
+
+    def insert_tag(self, name, parent=None):
+        self.cu.execute(self.SQL_INSERT_TAG, (name, parent))
+        tag_id = self.cu.lastrowid
+        self.c.commit()
+        return tag_id
+
+    def select_tags(self, parent=None):
+        sql = self.SQL_SELECT_TAGS if parent else self.SQL_SELECT_TAGS_NULL
+        params = (parent,) if parent else ()
+        for row in self.cu.execute(sql, params).fetchall():
+            yield row
 
     def __init__(self, db_path: Path) -> None:
         self.db_path = db_path

@@ -82,6 +82,38 @@ class Book(GObject.Object):
         return self._book_path
 
 
+class Tag(GObject.Object):
+    __gtype_name__ = 'Tag'
+    
+    def __init__(self, tag_id, name, checked, level=0):
+        super().__init__()
+        self._tag_id = tag_id
+        self._name = name
+        self._checked = checked
+        self._level = level
+
+        self._children = Gio.ListStore(item_type=Tag)
+
+    @GObject.Property(type=int)
+    def tag_id(self):
+        return self._tag_id
+
+    @GObject.Property(type=str)
+    def name(self):
+        return self._name
+
+    @GObject.Property(type=bool, default=True)
+    def checked(self):
+        return self._checked
+
+    @GObject.Property(type=int)
+    def level(self):
+        return self._level
+
+    def get_children(self):
+        return self._children
+
+
 class TaskListView:
     def _on_factory_setup(self, factory, list_item):
         #cell = Gtk.Inscription()
@@ -132,6 +164,7 @@ class BookListView:
         cell = Gtk.Box()
         cell.props.orientation = Gtk.Orientation.VERTICAL
         label = Gtk.Label()
+        label.props.xalign = 0
         cell.append(label)
         cell.l = label
         cell.l._binding = None
@@ -165,7 +198,7 @@ class BookListView:
         self.view.connect('activate', self.on_activate_item)
 
     def append(self, book_id, book_path):
-        item = Book(book_id, book_path)
+        item = Book(book_id, Path(book_path).name)
         self.list_store.append(item)
 
     def clear(self):
@@ -173,6 +206,109 @@ class BookListView:
 
     def on_activate_item(self, column_view, position):
         item = self.list_store.get_item(position)
+
+
+class TagTreeView:
+    def _on_factory_setup_name(self, factory, list_item):
+        cell = Gtk.Label()
+        cell.props.xalign = 0
+        cell._binding = None
+
+        # https://api.pygobject.gnome.org/Gtk-4.0/class-TreeExpander.html
+        tree_expander = Gtk.TreeExpander()
+        tree_expander.set_child(cell)
+        list_item.set_child(tree_expander)
+
+    def _on_factory_bind_name(self, factory, list_item):
+        cell = list_item.get_child().get_child()
+        item = list_item.get_item()
+        cell._binding = item.bind_property('name', cell, 'label', GObject.BindingFlags.SYNC_CREATE)
+
+        tag = list_item.props.item
+        cell.props.margin_start = 10 * tag.level
+
+        if item:
+            #text_variant = item.get_child_value(0)  # Get the first element of the tuple
+            #is_expandable_variant = item.get_child_value(1) # Get the second element
+
+            #label = list_item.get_child().get_child()  # Get the label inside TreeExpander
+            #label.set_text(text_variant.get_string())
+
+            tree_expander = list_item.get_child()
+            # Set the list_row property to associate with the current GtkTreeListRow
+            #tree_expander.set_list_row(list_item.get_list_row())
+
+            # Control expandability based on the data
+            #if is_expandable_variant.get_string() == "True":
+            tree_expander.set_indent_for_icon(True) # Add indentation
+            #else:
+            #    tree_expander.set_indent_for_row(False)
+
+
+    def _on_factory_setup_checked(self, factory, list_item):
+        cell = Gtk.CheckButton(label='')
+        #cell.connect('toggled', self.on_radio_toggled, '1')
+        cell._binding = None
+        list_item.set_child(cell)
+
+    def _on_factory_bind_checked(self, factory, list_item):
+        cell = list_item.get_child()
+        item = list_item.get_item()
+        cell._binding = item.bind_property('checked', cell, 'active', GObject.BindingFlags.SYNC_CREATE)
+
+    def _on_factory_unbind(self, factory, list_item):
+        cell = list_item.get_child()
+        if cell._binding:
+            cell._binding.unbind()
+            cell._binding = None
+
+    def _on_factory_teardown(self, factory, list_item):
+        cell = list_item.get_child()
+        cell._binding = None
+    
+    def get_children(self, item):
+        if isinstance(item, Tag):
+            return item.get_children()
+
+        return None
+
+    def __init__(self):
+        self.list_store = Gio.ListStore(item_type=Tag)
+        # https://api.pygobject.gnome.org/Gtk-4.0/class-TreeListModel.html
+        self.tree_store = Gtk.TreeListModel.new(self.list_store, True, True, self.get_children)
+        selection = Gtk.SingleSelection(model=self.tree_store)
+        self.view = Gtk.ColumnView(model=selection)
+
+        factory_name = Gtk.SignalListItemFactory()
+        factory_name.connect('setup', self._on_factory_setup_name)
+        factory_name.connect('bind', self._on_factory_bind_name)
+        factory_name.connect('unbind', self._on_factory_unbind)
+        factory_name.connect("teardown", self._on_factory_teardown)        
+        column_name = Gtk.ColumnViewColumn(title='Тег', factory=factory_name)
+        column_name.props.expand = True
+        self.view.append_column(column_name)
+
+        factory_checked = Gtk.SignalListItemFactory()
+        factory_checked.connect('setup', self._on_factory_setup_checked)
+        factory_checked.connect('bind', self._on_factory_bind_checked)
+        factory_checked.connect('unbind', self._on_factory_unbind)
+        factory_checked.connect("teardown", self._on_factory_teardown)        
+        column_checked = Gtk.ColumnViewColumn(title='and', factory=factory_checked)
+        column_checked.props.fixed_width = 50
+        self.view.append_column(column_checked)
+        
+        self.tags = {}
+
+    def append(self, tag_id, name, checked, parent_id=None):
+        if parent_id:
+            parent_tag = self.tags[parent_id]
+            tag = Tag(tag_id, name, checked, parent_tag.level + 1)
+            parent_tag._children.append(tag)
+        else:
+            tag = Tag(tag_id, name, checked, 0)
+            self.list_store.append(tag)
+
+        self.tags[tag_id] = tag
 
 
 class ScanWindow(Gtk.ApplicationWindow):
@@ -275,23 +411,37 @@ class AppWindow(Gtk.ApplicationWindow):
         self.config.set_storage_notes(Path('notes').resolve())#('A://Текст/книги_список_всех2')
         self.lib_storage.set_db(DBStorage(self.config.storage_books / 'sqlite3.db'))
 
+        #builder.button_show_meeting.connect('clicked', self.on_show_entities, Meeting, db.Meeting)
+        
+        # Дерево тегов
+        
+        self.builder.scrolled_tags.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        self.builder.scrolled_tags.set_propagate_natural_height(True)
+        
+        self.tag_tree = TagTreeView()
+        self.builder.tags.append(self.tag_tree.view)
+
+        self.build_tags()
+        
+        # Список книг
+        
         self.builder.scrolled_books.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         self.builder.scrolled_books.set_propagate_natural_height(True)
 
         self.book_list = BookListView()
         self.builder.books.append(self.book_list.view)
-
-        #builder.button_show_community.connect('clicked', self.on_show_entities, Community, db.Community)
-        #builder.button_show_task.connect('clicked', self.on_show_entities, Task, db.Task)
-        #builder.button_show_contact.connect('clicked', self.on_show_entities, Contact, db.Contact)
-        #builder.button_show_meeting.connect('clicked', self.on_show_entities, Meeting, db.Meeting)
-
-        #self.main_box = builder.main_box
-        #self.entities_column_view = None
-        #self.on_show_entities(None, Human, db.Human)
         
         for book_hash, book_id, directory, filename in self.lib_storage.db.select_rows():
             self.book_list.append(book_id, Path(directory) / filename)
+
+    def build_tags(self, parent_id=None):
+        parents = []
+        for tag_id, tag_name in self.lib_storage.db.select_tags(parent_id):
+            self.tag_tree.append(tag_id, tag_name, True, parent_id)
+            parents.append(tag_id)
+
+        for next_parent in parents:
+            self.build_tags(next_parent)
 
     def on_scan(self, action):
         window = ScanWindow(self.config, self.lib_storage, transient_for=self, title='Сканирование', modal=True)
