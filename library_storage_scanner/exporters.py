@@ -34,6 +34,13 @@ class MarkdownExporter:
     PREV_PAGE = '[<< Предыдщая страница](список_книг_{})'
     NEXT_PAGE = '[Следующая страница >>](список_книг_{})'
 
+    TAGS_TABLE_HEADER = (
+        '# Список тегов\n\n'
+        'ID | Имя тега | Родительский тег\n'
+        '--- | --- | ---\n'
+    )
+    TAG_TABLE_ROW = '{tag_id} | {name} | {parent_id}\n'
+
     def __init__(self, storage_structure, storage_directory):
         self.storage_structure = storage_structure
         self.csv_file = None
@@ -41,6 +48,9 @@ class MarkdownExporter:
         self.storage_directory = storage_directory
         if not os.path.exists(self.storage_structure):
             os.makedirs(self.storage_structure, exist_ok=True)
+
+        self.tags_file = open(os.path.join(self.storage_structure, 'теги.md'), 'w', encoding='utf-8')
+        self.tags_file.write(self.TAGS_TABLE_HEADER)
 
     def open_new_page(self, current_page):
         csv_full_path = os.path.join(self.storage_structure, 'список_книг_{}.md'.format(str(current_page)))
@@ -62,6 +72,15 @@ class MarkdownExporter:
                 filename=quote(row[3]),
             )
         )
+    
+    def write_tag_row(self, tag_id, name, parent_tag_id):
+        if parent_tag_id is None:
+            parent_tag_id = ''
+
+        self.tags_file.write(self.TAG_TABLE_ROW.format(tag_id=tag_id, name=name, parent_id=parent_tag_id))
+
+    def close_tags(self):
+        self.tags_file.close()
 
     def close(self, is_last_page):
         prev_page = self.PREV_PAGE.format(self.current_page - 1) if self.current_page > 1 else ''

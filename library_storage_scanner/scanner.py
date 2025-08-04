@@ -58,6 +58,7 @@ class DBStorage:
     SQL_INSERT_TAG = 'INSERT INTO tags (name, parent) VALUES (?, ?)'
     SQL_SELECT_TAGS = 'SELECT id, name FROM tags WHERE parent=?'
     SQL_SELECT_TAGS_NULL = 'SELECT id, name FROM tags WHERE parent IS NULL'
+    SQL_SELECT_ALL_TAGS = 'SELECT id, name, parent FROM tags'
 
     def insert_tag(self, name, parent=None):
         self.cu.execute(self.SQL_INSERT_TAG, (name, parent))
@@ -69,6 +70,10 @@ class DBStorage:
         sql = self.SQL_SELECT_TAGS if parent else self.SQL_SELECT_TAGS_NULL
         params = (parent,) if parent else ()
         for row in self.cu.execute(sql, params).fetchall():
+            yield row
+
+    def select_all_tags(self):
+        for row in self.cu.execute(self.SQL_SELECT_ALL_TAGS).fetchall():
             yield row
 
     def __init__(self, db_path: Path) -> None:
@@ -306,6 +311,11 @@ class LibraryStorage:
             progress_count_exported_files(index_of_current_row + 1, count_rows, csv_current_page)
 
         exporter.close(is_last_page=index_of_current_row is None or index_of_current_row == count_rows - 1)
+
+        for row in self.db.select_all_tags():
+            exporter.write_tag_row(*row)
+
+        exporter.close_tags()
 
     def import_csv_to_db(self, csv_path):
         def process_file_status(*args):
