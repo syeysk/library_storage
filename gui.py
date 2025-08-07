@@ -7,11 +7,11 @@ import gi
 gi.require_version('Gtk', '4.0')
 from gi.repository import GLib, Gio, Gtk, GObject, Gdk
 
-from library_storage_scanner.window_builder import WindowBuilder
-from library_storage_scanner.scanner import DBStorage, LibraryStorage
-from library_storage_scanner.exporters import MarkdownExporter
+from src.window_builder import WindowBuilder
+from src.scanner import DBStorage, LibraryStorage
+from src.exporters import MarkdownExporter
+from src.config import BASE_DIR, config
 
-BASE_DIR = Path(__file__).resolve().parent
 XML_DIR = BASE_DIR / 'xml'
 MENU_MAIN_PATH = XML_DIR / 'menu_main.xml'
 
@@ -30,45 +30,6 @@ def run_func_in_thread(func, args=(), kwargs=None, finish_func=None, finish_args
     thread = Thread(group=None, target=func, args=args, kwargs=kwargs)
     thread.start()
     #check()
-
-
-class Config:
-    _instance = None
-
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-
-        return cls._instance
-
-    def __init__(self):
-        self.storage_books = None
-        self.storage_notes = None
-        self.db_path = None
-        self.config_path = BASE_DIR / 'config.json'
-        self.load()
-    
-    def load(self):
-        with self.config_path.open(encoding='utf-8') as fjson:
-            data = json.load(fjson)
-            self.storage_books = Path(data['storage_books']).resolve()
-            self.storage_notes = Path(data['storage_notes']).resolve()
-
-        self.db_path = self.storage_books / 'sqlite3.db'
-
-    def dump(self):
-        with self.config_path.open('w', encoding='utf-8') as fjson:
-            data = {'storage_books': self.storage_books, 'storage_notes': self.storage_notes}
-            json.dump(fjson, data)
-
-    def set_storage_books(self, value: Path):
-        self.storage_books = value
-        self.db_path = self.storage_books / 'sqlite3.db'
-        self.dump()
-
-    def set_storage_notes(self, value: Path):
-        self.storage_notes = value
-        self.dump()
 
 
 class Task(GObject.Object):
@@ -340,9 +301,8 @@ class TagTreeView:
 
 
 class ScanWindow(Gtk.ApplicationWindow):
-    def __init__(self, config, lib_storage, *args, **kwargs):
+    def __init__(self, lib_storage, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.config = config
         self.lib_storage = lib_storage
 
         self.builder = WindowBuilder(XML_DIR / 'scan.xml', {})
@@ -368,7 +328,7 @@ class ScanWindow(Gtk.ApplicationWindow):
     def fg_scan(self):
         self.lib_storage.db.reopen()
         self.lib_storage.scan_to_db(
-            self.config.storage_books,
+            config.storage_books,
             'original',
             progress_count_scanned_files=self.progress_count_scanned_files,
             func_dublicate=self.add_dublicate_file_frame,
@@ -377,9 +337,8 @@ class ScanWindow(Gtk.ApplicationWindow):
 
 
 class ExportWindow(Gtk.ApplicationWindow):
-    def __init__(self, config, lib_storage, *args, **kwargs):
+    def __init__(self, lib_storage, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.config = config
         self.lib_storage = lib_storage
 
         self.builder = WindowBuilder(XML_DIR / 'export.xml', {})
@@ -393,7 +352,7 @@ class ExportWindow(Gtk.ApplicationWindow):
         self.builder.current_page.props.label = str(current_page)
 
     def fg_export(self):
-        exporter = MarkdownExporter(self.config.storage_notes, self.config.storage_books)
+        exporter = MarkdownExporter(config.storage_notes, config.storage_books)
     
         self.lib_storage.db.reopen()
         self.lib_storage.export_db_to_csv(
@@ -434,8 +393,7 @@ class AppWindow(Gtk.ApplicationWindow):
         self.builder.button_scan.connect('clicked', self.on_scan)
         self.builder.button_scan_extern.connect('clicked', self.on_scan_extern)
         self.builder.button_export.connect('clicked', self.on_export)
-        self.config = Config()
-        self.lib_storage.set_db(DBStorage(self.config.db_path))
+        self.lib_storage.set_db(DBStorage(config.db_path))
 
         #builder.button_show_meeting.connect('clicked', self.on_show_entities, Meeting, db.Meeting)
         
@@ -470,16 +428,16 @@ class AppWindow(Gtk.ApplicationWindow):
             self.build_tags(next_parent)
 
     def on_scan(self, action):
-        window = ScanWindow(self.config, self.lib_storage, transient_for=self, title='Сканирование', modal=True)
+        window = ScanWindow(self.lib_storage, transient_for=self, title='Сканирование', modal=True)
         window.present()
 
     def on_scan_extern(self, action):
         # TODO: открываем окно для выбора внешнего хранилища и только потом открываем окно
-        window = ScanWindow(self.config, self.lib_storage, transient_for=self, title='Сканирование', modal=True)
+        window = ScanWindow(self.lib_storage, transient_for=self, title='Сканирование', modal=True)
         window.present()
 
     def on_export(self, action):
-        window = ExportWindow(self.config, self.lib_storage, transient_for=self, title='Экспорт', modal=True)
+        window = ExportWindow(self.lib_storage, transient_for=self, title='Экспорт', modal=True)
         window.present()
 
 
