@@ -59,6 +59,7 @@ class DBStorage:
     SQL_SELECT_TAGS = 'SELECT id, name FROM tags WHERE parent=?'
     SQL_SELECT_TAGS_NULL = 'SELECT id, name FROM tags WHERE parent IS NULL'
     SQL_SELECT_ALL_TAGS = 'SELECT id, name, parent FROM tags'
+    SQL_SELECT_TAG = 'SELECT name, parent FROM tags WHERE id=?'
 
     def insert_tag(self, name, parent=None):
         self.cu.execute(self.SQL_INSERT_TAG, (name, parent))
@@ -75,6 +76,9 @@ class DBStorage:
     def select_all_tags(self):
         for row in self.cu.execute(self.SQL_SELECT_ALL_TAGS).fetchall():
             yield row
+
+    def select_tag(self, tag_id):
+        return self.cu.execute(self.SQL_SELECT_TAG, (tag_id,)).fetchone()
 
     def __init__(self, db_path: Path) -> None:
         self.db_path = db_path
