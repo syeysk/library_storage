@@ -36,7 +36,7 @@ class WindowBuilder:
 
             kwargs = {}
 
-            if tag in ('Label', 'Button'):
+            if tag in ('Label', 'Button', 'CheckButton'):
                 kwargs['label'] = node.text
             elif tag == 'Entry':
                 kwargs['text'] = node.text
