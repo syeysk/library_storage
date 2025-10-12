@@ -208,7 +208,6 @@ class LibraryStorage:
     def __init__(self) -> None:
         """Инициализирует класс сканера хранилища"""
         self.db = None
-        #self.diffs = None
 
     def __enter__(self):
         return self
@@ -259,13 +258,9 @@ class LibraryStorage:
                     else:  # для прохождения тестов
                         print(self.MESSAGE_DOUBLE.format(existed_path, inserted_path))
 
-            #if status != STATUS_UNTOUCHED:
-            #    self.diffs.append((status, existed_path, inserted_path, file_hash, file_id))
-
         self.db.set_is_deleted_for_all()
         os.chdir(library_path)
         total_count_files = 0
-        #self.diffs = []
         for directory, _, filenames in os.walk('./'):
             directory = directory[2:]
             if os.path.sep == '\\':
@@ -336,61 +331,6 @@ class LibraryStorage:
 
         self.db.insert_rows(func=process_file_status)
 
-    '''
-    def save_diff(self, library_path, diff_file_path):
-        diff_zip = zipfile.ZipFile(diff_file_path, 'w')
-        diff_file = StringIO(newline=None)  # it's mean `newline='\n'`. See details: https://stackoverflow.com/questions/9157623/unexpected-behavior-of-universal-newline-mode-with-stringio-and-csv-modules
-        diff_csv = csv.writer(diff_file)
-        for status, existed_path, inserted_path, fiile_hash, file_id in self.diffs:
-            diff_csv.writerow((status, existed_path, inserted_path, fiile_hash, file_id))
-            if status == STATUS_NEW:
-                diff_zip.write(
-                    os.path.join(library_path, inserted_path),
-                    os.path.join('storage', inserted_path)
-                )
-
-        self.db.print_deleted_files(func=diff_csv.writerow)
-        diff_zip.writestr(self.ARCHIVE_DIFF_FILE_NAME, diff_file.getvalue())
-        diff_zip.close()
-
-    def apply_diff(self, library_path, diff_file_zip_path):
-        with zipfile.ZipFile(diff_file_zip_path, 'r') as diff_zip:
-            diff_zip.testzip()
-            with diff_zip.open(self.ARCHIVE_DIFF_FILE_NAME, 'r') as diff_file:
-                diff_file_io = TextIOWrapper(diff_file, encoding='utf-8')
-                diff_csv = csv.reader(diff_file_io)
-                for status, existed_file, inserted_file, file_hash, file_id in diff_csv:
-                    if existed_file:
-                        full_existed_path = os.path.join(library_path, existed_file)
-                        full_existed_path = os.path.normpath(full_existed_path)
-
-                    if inserted_file:
-                        full_inserted_path = os.path.join(library_path, inserted_file)
-                        full_inserted_path = os.path.normpath(full_inserted_path)
-
-                    if status == STATUS_NEW:
-                        if os.path.exists(full_inserted_path):
-                            print(status, 'Файл существует:', full_inserted_path)
-
-                        diff_zip.extract(os.path.join('storage/', inserted_file), library_path)
-                        self.db.insert_file(file_hash, file_id, inserted_file)
-                    elif status == STATUS_DELETED:
-                        os.unlink(full_existed_path)
-                        self.db.delete_file(file_hash)
-                    elif status in (STATUS_MOVED, STATUS_RENAMED, STATUS_MOVED_AND_RENAMED):
-                        if os.path.exists(full_inserted_path):
-                            print(status, 'Файл существует:', full_inserted_path)
-
-                        inserted_dirname = os.path.dirname(full_inserted_path)
-                        if not os.path.exists(inserted_dirname):
-                            os.makedirs(inserted_dirname)
-
-                        os.rename(full_existed_path, full_inserted_path)
-                        self.db.rename_file(file_hash, inserted_file)
-
-                diff_file.close()
-    '''
-
     def get_file_status(self, inserted_directory, inserted_filename, is_exists, existed_directory, existed_filename):
         inserted_path = '{}/{}'.format(inserted_directory, inserted_filename)  # .removeprefix('/')
         inserted_path = inserted_path[1:] if inserted_path.startswith('/') else inserted_path
@@ -409,24 +349,3 @@ class LibraryStorage:
             return STATUS_UNTOUCHED, existed_path, inserted_path
 
         return STATUS_NEW, None, inserted_path
-
-
-'''
-def scan_storage_and_save_structure(path_to_library, path_for_save_struct):
-    with LibraryStorage(':memory:') as lib_storage:
-        lib_storage.scan_to_db(library_path=path_to_library)
-        lib_storage.export_db(csv_path=path_for_save_struct)
-
-
-def scan_storage_and_save_diff(path_to_library, path_to_struct, path_to_save_diff):
-    with LibraryStorage(':memory:') as lib_storage:
-        lib_storage.import_csv_to_db(path_to_struct)
-        lib_storage.scan_to_db(library_path=path_to_library)
-        lib_storage.save_diff(library_path=path_to_library, diff_file_path=path_to_save_diff)
-
-
-def apply_diff(path_to_library, path_to_diff):
-    with LibraryStorage(':memory:') as lib_storage:
-        lib_storage.scan_to_db(library_path=path_to_library)
-        lib_storage.apply_diff(library_path=path_to_library, diff_file_zip_path=path_to_diff)
-'''
