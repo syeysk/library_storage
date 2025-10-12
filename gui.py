@@ -105,21 +105,35 @@ class Tag(GObject.Object):
 
 class TaskListView:
     def _on_factory_setup(self, factory, list_item):
-        #cell = Gtk.Inscription()
-        cell = Gtk.Label()
-        cell._binding = None
+        builder = WindowBuilder(XML_DIR / 'task_double.xml', {})
+        cell = builder.root_widget
+        cell.builder = builder
+        
+        builder.inserted_path._binding = None
+        builder.existed_path._binding = None
         list_item.set_child(cell)
 
     def _on_factory_bind(self, factory, list_item):
         cell = list_item.get_child()
         item = list_item.get_item()
-        cell._binding = item.bind_property('existed_path', cell, 'label', GObject.BindingFlags.SYNC_CREATE)
+
+        existed_label = cell.builder.existed_path
+        existed_label._binding = item.bind_property('existed_path', existed_label, 'label', GObject.BindingFlags.SYNC_CREATE)
+        inserted_label = cell.builder.inserted_path
+        inserted_label._binding = item.bind_property('inserted_path', inserted_label, 'label', GObject.BindingFlags.SYNC_CREATE)
 
     def _on_factory_unbind(self, factory, list_item):
         cell = list_item.get_child()
-        if cell._binding:
-            cell._binding.unbind()
-            cell._binding = None
+        
+        existed_label = cell.builder.existed_path
+        if existed_label._binding:
+            existed_label._binding.unbind()
+            existed_label._binding = None
+
+        inserted_label = cell.builder.inserted_path
+        if inserted_label._binding:
+            inserted_label._binding.unbind()
+            inserted_label._binding = None
 
     def _on_factory_teardown(self, factory, list_item):
         cell = list_item.get_child()
@@ -304,6 +318,7 @@ class ScanWindow(Gtk.ApplicationWindow):
     def __init__(self, lib_storage, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.lib_storage = lib_storage
+        self.set_default_size(900, 500)
 
         self.builder = WindowBuilder(XML_DIR / 'scan.xml', {})
         self.set_child(self.builder.root_widget)
@@ -355,7 +370,7 @@ class ExportWindow(Gtk.ApplicationWindow):
         exporter = MarkdownExporter(config.storage_notes, config.storage_books)
     
         self.lib_storage.db.reopen()
-        self.lib_storage.export_db_to_csv(
+        self.lib_storage.export_db(
             exporter,
             self.progress_count_exported_files,
         )

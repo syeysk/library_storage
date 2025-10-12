@@ -188,7 +188,7 @@ class DBStorage:
         )
         self.c.commit()
 
-    def update(self, file_hash, inserted_directory, inserted_filename):
+    def update_and_set_is_not_deleted(self, file_hash, inserted_directory, inserted_filename):
         self.cu.execute(self.SQL_UPDATE_FILE_WITH_IS_DELETED, (inserted_directory, inserted_filename, file_hash))
 
     def get_filepath(self, file_hash):
@@ -208,7 +208,7 @@ class LibraryStorage:
     def __init__(self) -> None:
         """Инициализирует класс сканера хранилища"""
         self.db = None
-        self.diffs = None
+        #self.diffs = None
 
     def __enter__(self):
         return self
@@ -238,7 +238,7 @@ class LibraryStorage:
                     is_deleted,):
             status, existed_path, inserted_path = self.get_file_status(inserted_directory, inserted_filename, is_exists, existed_directory, existed_filename)
             if is_exists:
-                if process_dublicate == 'original':
+                if process_dublicate == 'original':  # обработка дубликата для хранилища
                     if status == STATUS_UNTOUCHED:
                         # обнаружен дубликат с тем же именем - всё нормально, это один и тот же файл
                         self.db.set_is_not_deleted(file_hash)
@@ -251,21 +251,21 @@ class LibraryStorage:
                                 func_dublicate(existed_path, inserted_path, file_hash)
                         else:
                             # первоначального файла не существует, что означает, что дубликат - это переименованый файл
-                            self.db.update(file_hash, inserted_directory, inserted_filename)
-                elif process_dublicate == 'copy':
+                            self.db.update_and_set_is_not_deleted(file_hash, inserted_directory, inserted_filename)
+                elif process_dublicate == 'copy':  # обработка дубликата для внешнего хранилища
                     # игнорируем любые дубликаты - они из копии в оригинал не попадут
                     if is_deleted:
                         self.db.set_is_not_deleted(file_hash)
                     else:  # для прохождения тестов
                         print(self.MESSAGE_DOUBLE.format(existed_path, inserted_path))
 
-            if status != STATUS_UNTOUCHED:
-                self.diffs.append((status, existed_path, inserted_path, file_hash, file_id))
+            #if status != STATUS_UNTOUCHED:
+            #    self.diffs.append((status, existed_path, inserted_path, file_hash, file_id))
 
         self.db.set_is_deleted_for_all()
         os.chdir(library_path)
         total_count_files = 0
-        self.diffs = []
+        #self.diffs = []
         for directory, _, filenames in os.walk('./'):
             directory = directory[2:]
             if os.path.sep == '\\':
@@ -288,9 +288,9 @@ class LibraryStorage:
         # print('Обнаружено файлов:', total_count_files, 'шт')
         #self.db.print_deleted_files(process_file_status)
 
-    def export_db_to_csv(self, exporter, progress_count_exported_files=None) -> None:
+    def export_db(self, exporter, progress_count_exported_files=None) -> None:
         """
-        Экспортирует из базы метаинформацию в CSV без заголовков. Формат строки следующий:
+        Экспортирует из базы следующую информацию о файле:
         хэш,идентификатор,директория,имя файла
         """
         csv_current_page = 1
@@ -336,9 +336,10 @@ class LibraryStorage:
 
         self.db.insert_rows(func=process_file_status)
 
+    '''
     def save_diff(self, library_path, diff_file_path):
         diff_zip = zipfile.ZipFile(diff_file_path, 'w')
-        diff_file = StringIO(newline=None)  # it's mean `newline='\n'`. More: https://stackoverflow.com/questions/9157623/unexpected-behavior-of-universal-newline-mode-with-stringio-and-csv-modules
+        diff_file = StringIO(newline=None)  # it's mean `newline='\n'`. See details: https://stackoverflow.com/questions/9157623/unexpected-behavior-of-universal-newline-mode-with-stringio-and-csv-modules
         diff_csv = csv.writer(diff_file)
         for status, existed_path, inserted_path, fiile_hash, file_id in self.diffs:
             diff_csv.writerow((status, existed_path, inserted_path, fiile_hash, file_id))
@@ -388,6 +389,7 @@ class LibraryStorage:
                         self.db.rename_file(file_hash, inserted_file)
 
                 diff_file.close()
+    '''
 
     def get_file_status(self, inserted_directory, inserted_filename, is_exists, existed_directory, existed_filename):
         inserted_path = '{}/{}'.format(inserted_directory, inserted_filename)  # .removeprefix('/')
@@ -409,10 +411,11 @@ class LibraryStorage:
         return STATUS_NEW, None, inserted_path
 
 
+'''
 def scan_storage_and_save_structure(path_to_library, path_for_save_struct):
     with LibraryStorage(':memory:') as lib_storage:
         lib_storage.scan_to_db(library_path=path_to_library)
-        lib_storage.export_db_to_csv(csv_path=path_for_save_struct)
+        lib_storage.export_db(csv_path=path_for_save_struct)
 
 
 def scan_storage_and_save_diff(path_to_library, path_to_struct, path_to_save_diff):
@@ -426,3 +429,4 @@ def apply_diff(path_to_library, path_to_diff):
     with LibraryStorage(':memory:') as lib_storage:
         lib_storage.scan_to_db(library_path=path_to_library)
         lib_storage.apply_diff(library_path=path_to_library, diff_file_zip_path=path_to_diff)
+'''

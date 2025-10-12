@@ -67,7 +67,7 @@ args = parser.parse_args()
 #elif args.command == 'export':
 #    struct_dir = os.path.abspath(args.struct)
 #    with LibraryStorage(db_path=db_path) as lib_storage:
-#        lib_storage.export_db_to_csv(struct_dir)
+#        lib_storage.export_db(struct_dir)
 
 #elif args.command == 'makediff':
 #    library_dir = os.path.abspath(args.path)

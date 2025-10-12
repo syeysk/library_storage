@@ -12,7 +12,7 @@
 			</Box>
 	    </Box>
 	</ScrolledWindow>
-	<ScrolledWindow id="scrolled_books">
+	<ScrolledWindow id="scrolled_books" vexpand="">
 		<Box id="books">
 		</Box>
 	</ScrolledWindow>

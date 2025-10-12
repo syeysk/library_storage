@@ -1,0 +1,22 @@
+<?xml version="1.1" encoding="UTF-8" ?>
+<Grid margin_top="6" margin_start="6" margin_end="6" margin_bottom="6">
+	<Row>
+	    <Label colspan="2" xalign="0" markup=""><![CDATA[<b>Дубликат</b>]]></Label>
+	</Row>
+
+	<Row>
+	    <Label id="inserted_path" colspan="2" xalign="0"></Label>
+	</Row>
+	<Row>
+        <Button id="button_inserted">Удалить</Button>
+	    <Label xalign="0">Есть на диске</Label>
+	</Row>
+
+	<Row>
+	    <Label id="existed_path" colspan="2" xalign="0"></Label>
+	</Row>
+	<Row>
+        <Button id="button_existed">Удалить</Button>
+	    <Label xalign="0">Есть на диске и в базе</Label>
+	</Row>
+</Grid>

@@ -40,15 +40,15 @@ class WindowBuilder:
                 kwargs['label'] = node.text
             elif tag == 'Entry':
                 kwargs['text'] = node.text
-            elif tag == 'EntityColumnView':
-                kwargs['parent_window'] = self.parent_window
-                kwargs['item_type'] = globals()[node.attrib.pop('item_type')]
-                kwargs['linking_table'] = getattr(db, node.attrib.pop('linking_table'))
-                kwargs['item_main'] = node.attrib.pop('item_main')
-                kwargs['item_slave'] = node.attrib.pop('item_slave')
-                if 'same' in node.attrib:
-                    kwargs['same'] = True
-                    node.attrib.pop('same')
+            #elif tag == 'EntityColumnView':
+            #    kwargs['parent_window'] = self.parent_window
+            #    kwargs['item_type'] = globals()[node.attrib.pop('item_type')]
+            #    kwargs['linking_table'] = getattr(db, node.attrib.pop('linking_table'))
+            #    kwargs['item_main'] = node.attrib.pop('item_main')
+            #    kwargs['item_slave'] = node.attrib.pop('item_slave')
+            #    if 'same' in node.attrib:
+            #        kwargs['same'] = True
+            #        node.attrib.pop('same')
             elif tag == 'Picture':
                 kwargs['filename'] = str(BASE_DIR / node.attrib.pop('filename'))
             elif tag == 'Box':
@@ -60,8 +60,12 @@ class WindowBuilder:
             for attr_name, attr_value in node.attrib.items():
                 if attr_name == 'id':
                     setattr(self, attr_value, gtkelem)
+                elif attr_name == 'markup' and tag == 'Label':
+                    gtkelem.set_markup(node.text)
+                elif attr_name == 'vexpand':
+                    gtkelem.set_vexpand(True)
                 else:
-                    if attr_name in {'selected', 'xalign', 'spacing', 'margin_top', 'margin_start', 'margin_bottom', 'margin_end', 'column_spacing', 'row_spacing'}:
+                    if attr_name in {'selected', 'xalign', 'spacing', 'margin_top', 'margin_start', 'margin_bottom', 'margin_end', 'column_spacing', 'row_spacing', 'max_content_height'}:
                         attr_value = int(attr_value) if attr_value else 0
 
                     setattr(gtkelem.props, attr_name, attr_value)
