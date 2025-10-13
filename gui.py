@@ -212,7 +212,7 @@ class BookListView:
 
     def _on_factory_unbind(self, factory, list_item):
         cell = list_item.get_child()
-        if cell._binding:
+        if cell.l._binding:
             cell.l._binding.unbind()
             cell.l._binding = None
 
@@ -356,6 +356,10 @@ class ScanWindow(Gtk.ApplicationWindow):
         STATUS_DELETED: 'task_deleted.xml',
         STATUS_DUPLICATE: 'task_duplicate.xml',
     }
+    
+    @GObject.Signal(arg_types=())
+    def scan_end(self):
+        pass
 
     def __init__(self, lib_storage, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -373,7 +377,14 @@ class ScanWindow(Gtk.ApplicationWindow):
     def progress_count_scanned_files(self, count_scanned_files):
         self.builder.count_scanned_files.props.label = str(count_scanned_files)
 
-    def add_dublicate_file_frame(self, status, existed_filepath, inserted_filepath, file_hash):
+    def delete_duplicate(self, _, builder, inserted_filepath):
+        try:
+            (config.storage_books / inserted_filepath).unlink()
+            builder.button_inserted.props.sensitive = False
+        except Exception as error:
+            print(error)
+
+    def add_file_item(self, status, existed_filepath, inserted_filepath, file_hash):
         if status == STATUS_UNTOUCHED:
             return
 
@@ -383,6 +394,9 @@ class ScanWindow(Gtk.ApplicationWindow):
 
         if hasattr(builder, 'existed_path'):
             builder.existed_path.props.label = existed_filepath
+
+        if status == STATUS_DUPLICATE:
+            builder.button_inserted.connect('clicked', self.delete_duplicate, builder, inserted_filepath)
 
         self.builder.books.append(builder.root_widget)
         #self.task_list.append(status, existed_filepath, inserted_filepath)
@@ -396,8 +410,9 @@ class ScanWindow(Gtk.ApplicationWindow):
             config.storage_books,
             'original',
             progress_count_scanned_files=self.progress_count_scanned_files,
-            func=self.add_dublicate_file_frame,
+            func=self.add_file_item,
         )
+        self.emit('scan_end')
         #GLib.idle_add(self.fg_finish)
 
 
@@ -480,6 +495,10 @@ class AppWindow(Gtk.ApplicationWindow):
         self.book_list = BookListView()
         self.builder.books.append(self.book_list.view)
         
+        self.update_book_list()
+    
+    def update_book_list(self, _=None):
+        self.book_list.clear()
         for book_hash, book_id, directory, filename in self.lib_storage.db.select_rows():
             self.book_list.append(book_id, Path(directory) / filename)
 
@@ -494,6 +513,7 @@ class AppWindow(Gtk.ApplicationWindow):
 
     def on_scan(self, action):
         window = ScanWindow(self.lib_storage, transient_for=self, title='Сканирование', modal=True)
+        window.connect('scan_end', self.update_book_list)
         window.present()
 
     def on_scan_extern(self, action):
