@@ -2,7 +2,7 @@
 <Box spacing="6" margin_top="6" margin_start="6" margin_end="6" margin_bottom="6" orientation="HORIZONTAL">
     <Box spacing="6" margin_top="6" margin_start="6" margin_end="6" margin_bottom="6">
     	<Button id="button_scan">Сканировать</Button>
-    	<Button id="button_scan_extern">Сканировать внешнее</Button>
+    	<Button id="button_scan_extern" sensitive="False">Сканировать внешнее</Button>
 	    <!--<Grid>
 		    <Row>
         	    <Button id="button_change_storage_books" colspan="1">✏️</Button>
@@ -15,7 +15,7 @@
 		</ScrolledWindow>
 		<Box>
     	    <Button id="button_export">Экспортировать в заметки</Button>
-	        <Button id="button_import">Импортировать из заметок</Button>
+	        <Button id="button_import" sensitive="False">Импортировать из заметок</Button>
 			<!--<Grid>
 				<Row>
 					<Button id="button_change_storage_nnotes" colspan="1">✏️</Button>
@@ -25,8 +25,8 @@
 		</Box>
     </Box>
     <Box>
-		<ScrolledWindow id="scrolled_books" vexpand="">
-			<Box id="books" vexpand="">
+		<ScrolledWindow id="scrolled_books" vexpand="" hexpand="">
+			<Box id="books" vexpand="" hexpand="">
 			</Box>
 		</ScrolledWindow>
 	</Box>

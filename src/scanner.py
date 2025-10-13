@@ -12,7 +12,8 @@ STATUS_RENAMED = 'Переименовали'
 STATUS_MOVED_AND_RENAMED = 'Переместили и переименовали'
 STATUS_UNTOUCHED = 'Не тронут'
 STATUS_DELETED = 'Удалён'
-LIBRARY_IGNORE_EXTENSIONS = ['mp3', 'db']
+STATUS_DUPLICATE = 'Дубликат'
+LIBRARY_IGNORE_EXTENSIONS = ['mp3', 'db', 'db-journal']
 
 
 def get_file_hash(file_path):
@@ -52,7 +53,6 @@ class DBStorage:
     SQL_DELETE_FILE = 'DELETE FROM files WHERE hash=?'
     SQL_UPDATE_SET_IS_DELETED_FOR_ALL = 'UPDATE files SET is_deleted=1'
     SQL_UPDATE_SET_IS_DELETED = 'UPDATE files SET is_deleted=0 WHERE hash=?'
-    SQL_UPDATE_FILE_WITH_IS_DELETED = 'UPDATE files SET is_deleted=0, directory=?, filename=? WHERE hash=?'
     SQL_UPDATE_FILE = 'UPDATE files SET directory=?, filename=? WHERE hash=?'
 
     SQL_INSERT_TAG = 'INSERT INTO tags (name, parent) VALUES (?, ?)'
@@ -129,6 +129,7 @@ class DBStorage:
             inserted_directory, inserted_filename = sql_params[2 if with_id else 1:]
             if row:
                 existed_directory, existed_filename, is_deleted = row
+                self.set_is_not_deleted(file_hash)
             else:
                 self.cu.execute(sql_insert, sql_params)
                 existed_directory, existed_filename, is_deleted = None, None, None
@@ -178,15 +179,8 @@ class DBStorage:
         )
         self.c.commit()
 
-    def rename_file(self, file_hash, inserted_file):
-        self.cu.execute(
-            self.SQL_UPDATE_FILE,
-            (os.path.dirname(inserted_file), os.path.basename(inserted_file), file_hash)
-        )
-        self.c.commit()
-
-    def update_and_set_is_not_deleted(self, file_hash, inserted_directory, inserted_filename):
-        self.cu.execute(self.SQL_UPDATE_FILE_WITH_IS_DELETED, (inserted_directory, inserted_filename, file_hash))
+    def update(self, file_hash, inserted_directory, inserted_filename):
+        self.cu.execute(self.SQL_UPDATE_FILE, (inserted_directory, inserted_filename, file_hash))
 
     def get_filepath(self, file_hash):
         existed_directory, existed_filename, _ = self.cu.execute(self.SQL_SELECT_FILE, (file_hash,)).fetchone()
@@ -221,7 +215,7 @@ class LibraryStorage:
             library_path: Path,
             process_dublicate,
             progress_count_scanned_files=None,
-            func_dublicate=None,
+            func=None,
     ):
         """Сканирует информацию о файлах в директории и заносит её в базу"""
         def process_file_status(inserted_directory,
@@ -232,26 +226,17 @@ class LibraryStorage:
                     is_deleted,):
             status, existed_path, inserted_path = self.get_file_status(inserted_directory, inserted_filename, existed_directory, existed_filename)
             if status != STATUS_NEW:
-                if process_dublicate == 'original':  # обработка дубликата для хранилища
-                    if status == STATUS_UNTOUCHED:
-                        # обнаружен дубликат с тем же именем - всё нормально, это один и тот же файл
-                        self.db.set_is_not_deleted(file_hash)
-                    elif status in {STATUS_MOVED, STATUS_RENAMED, STATUS_MOVED_AND_RENAMED}:
-                        if os.path.exists(existed_path):
-                            # обнаружен дубликат с отличающимся именем и существующим первоначальным файлом -
-                            # - уведомляем об этом, чтобы пользователь мог удалить один из них
-                            print(self.MESSAGE_DOUBLE.format(existed_path, inserted_path))
-                            if func_dublicate:
-                                func_dublicate(existed_path, inserted_path, file_hash)
-                        else:
-                            # первоначального файла не существует, что означает, что дубликат - это переименованый файл
-                            self.db.update_and_set_is_not_deleted(file_hash, inserted_directory, inserted_filename)
-                elif process_dublicate == 'copy':  # обработка дубликата для внешнего хранилища
-                    # игнорируем любые дубликаты - они из копии в оригинал не попадут
-                    if is_deleted:
-                        self.db.set_is_not_deleted(file_hash)
-                    else:  # для прохождения тестов
+                if process_dublicate == 'original':
+                    if status in {STATUS_MOVED, STATUS_RENAMED, STATUS_MOVED_AND_RENAMED}:
+                        self.db.update(file_hash, inserted_directory, inserted_filename)
+                    elif status == STATUS_DUPLICATE:
                         print(self.MESSAGE_DOUBLE.format(existed_path, inserted_path))
+                elif process_dublicate == 'copy':
+                    if not is_deleted:  # для прохождения тестов
+                        print(self.MESSAGE_DOUBLE.format(existed_path, inserted_path))
+
+            if func:
+                func(status, existed_path, inserted_path, file_hash)
 
         self.db.set_is_deleted_for_all()
         os.chdir(library_path)
@@ -334,12 +319,13 @@ class LibraryStorage:
             existed_path = existed_path[1:] if existed_path.startswith('/') else existed_path
             is_replaced = inserted_directory != existed_directory
             is_renamed = inserted_filename != existed_filename
+            is_exists = os.path.exists(existed_path)
             if is_replaced and not is_renamed:
-                return STATUS_MOVED, existed_path, inserted_path
+                return STATUS_DUPLICATE if is_exists else STATUS_MOVED, existed_path, inserted_path
             elif not is_replaced and is_renamed:
-                return STATUS_RENAMED, existed_path, inserted_path
+                return STATUS_DUPLICATE if is_exists else STATUS_RENAMED, existed_path, inserted_path
             elif is_replaced and is_renamed:
-                return STATUS_MOVED_AND_RENAMED, existed_path, inserted_path
+                return STATUS_DUPLICATE if is_exists else STATUS_MOVED_AND_RENAMED, existed_path, inserted_path
 
             return STATUS_UNTOUCHED, existed_path, inserted_path
 

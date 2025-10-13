@@ -1,0 +1,18 @@
+<?xml version="1.1" encoding="UTF-8" ?>
+<Grid margin_top="6" margin_start="6" margin_end="6" margin_bottom="6">
+	<Row>
+	    <Label colspan="2" xalign="0" markup="" id="title"><![CDATA[<b>Перемещён и/или переименован</b>]]></Label>
+	</Row>
+
+	<Row>
+	    <Label xalign="0">Откуда:</Label>
+	    <Label id="existed_path" xalign="0"></Label>
+	</Row>
+	<Row>
+	    <Label xalign="0">Куда:</Label>
+	    <Label id="inserted_path" xalign="0"></Label>
+	</Row>
+	<Row>
+	    <Button id="button_cancel" sensitive="False" colspan="2">Отменить</Button>
+	</Row>
+</Grid>

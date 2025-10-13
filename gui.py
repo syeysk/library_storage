@@ -8,7 +8,10 @@ gi.require_version('Gtk', '4.0')
 from gi.repository import GLib, Gio, Gtk, GObject, Gdk
 
 from src.window_builder import WindowBuilder
-from src.scanner import DBStorage, LibraryStorage
+from src.scanner import (
+    DBStorage, LibraryStorage, STATUS_NEW, STATUS_MOVED, STATUS_RENAMED, STATUS_MOVED_AND_RENAMED,
+    STATUS_UNTOUCHED, STATUS_DELETED, STATUS_DUPLICATE,
+)
 from src.exporters import MarkdownExporter
 from src.config import BASE_DIR, config
 
@@ -31,7 +34,7 @@ def run_func_in_thread(func, args=(), kwargs=None, finish_func=None, finish_args
     thread.start()
     #check()
 
-
+'''
 class Task(GObject.Object):
     __gtype_name__ = 'Task'
     
@@ -41,7 +44,7 @@ class Task(GObject.Object):
         self._inserted_path = inserted_path
         self._existed_path = existed_path
 
-    @GObject.Property(type=int)
+    @GObject.Property(type=str)
     def status(self):
         return self._status
 
@@ -52,7 +55,7 @@ class Task(GObject.Object):
     @GObject.Property(type=str)
     def existed_path(self):
         return self._existed_path
-
+'''
 
 class Book(GObject.Object):
     __gtype_name__ = 'Book'
@@ -102,38 +105,67 @@ class Tag(GObject.Object):
     def get_children(self):
         return self._children
 
-
+'''
 class TaskListView:
+    task_item_widgets = {
+        STATUS_NEW: 'task_new.xml',
+        STATUS_MOVED: 'task_moved.xml',
+        STATUS_RENAMED: 'task_moved.xml',
+        STATUS_MOVED_AND_RENAMED: 'task_moved.xml',
+        STATUS_UNTOUCHED: 'task_untouched.xml',
+        STATUS_DELETED: 'task_deleted.xml',
+        STATUS_DUPLICATE: 'task_duplicate.xml',
+    }
+
     def _on_factory_setup(self, factory, list_item):
-        builder = WindowBuilder(XML_DIR / 'task_double.xml', {})
+        builder = WindowBuilder(XML_DIR / self.task_item_widgets[STATUS_MOVED], {})
         cell = builder.root_widget
         cell.builder = builder
-        
-        builder.inserted_path._binding = None
-        builder.existed_path._binding = None
+
+        if hasattr(builder, 'inserted_path'):
+            builder.inserted_path._binding = None
+
+        if hasattr(builder, 'existed_path'):
+            builder.existed_path._binding = None
+
+        builder.title._binding = None
         list_item.set_child(cell)
 
     def _on_factory_bind(self, factory, list_item):
         cell = list_item.get_child()
         item = list_item.get_item()
 
-        existed_label = cell.builder.existed_path
-        existed_label._binding = item.bind_property('existed_path', existed_label, 'label', GObject.BindingFlags.SYNC_CREATE)
-        inserted_label = cell.builder.inserted_path
-        inserted_label._binding = item.bind_property('inserted_path', inserted_label, 'label', GObject.BindingFlags.SYNC_CREATE)
+        if hasattr(cell.builder, 'existed_path'):
+            existed_label = cell.builder.existed_path
+            existed_label._binding = item.bind_property('existed_path', existed_label, 'label', GObject.BindingFlags.SYNC_CREATE)
+
+        if hasattr(cell.builder, 'inserted_path'):
+            inserted_label = cell.builder.inserted_path
+            inserted_label._binding = item.bind_property('inserted_path', inserted_label, 'label', GObject.BindingFlags.SYNC_CREATE)
+
+        title_label = cell.builder.title
+        title_label._binding = item.bind_property('status', title_label, 'label', GObject.BindingFlags.SYNC_CREATE)
 
     def _on_factory_unbind(self, factory, list_item):
         cell = list_item.get_child()
         
-        existed_label = cell.builder.existed_path
-        if existed_label._binding:
-            existed_label._binding.unbind()
-            existed_label._binding = None
+        if hasattr(cell.builder, 'existed_path'):
+            existed_label = cell.builder.existed_path
+            if existed_label._binding:
+                existed_label._binding.unbind()
+                existed_label._binding = None
 
-        inserted_label = cell.builder.inserted_path
-        if inserted_label._binding:
-            inserted_label._binding.unbind()
-            inserted_label._binding = None
+        if hasattr(cell.builder, 'inserted_path'):
+            inserted_label = cell.builder.inserted_path
+            if inserted_label._binding:
+                inserted_label._binding.unbind()
+                inserted_label._binding = None
+
+        title_label = cell.builder.title
+        if title_label._binding:
+            title_label._binding.unbind()
+            title_label._binding = None
+
 
     def _on_factory_teardown(self, factory, list_item):
         cell = list_item.get_child()
@@ -160,7 +192,7 @@ class TaskListView:
 
     def on_activate_item(self, column_view, position):
         item = self.list_store.get_item(position)
-
+'''
 
 class BookListView:
     def _on_factory_setup(self, factory, list_item):
@@ -315,6 +347,16 @@ class TagTreeView:
 
 
 class ScanWindow(Gtk.ApplicationWindow):
+    task_item_widgets = {
+        STATUS_NEW: 'task_new.xml',
+        STATUS_MOVED: 'task_moved.xml',
+        STATUS_RENAMED: 'task_moved.xml',
+        STATUS_MOVED_AND_RENAMED: 'task_moved.xml',
+        STATUS_UNTOUCHED: 'task_untouched.xml',
+        STATUS_DELETED: 'task_deleted.xml',
+        STATUS_DUPLICATE: 'task_duplicate.xml',
+    }
+
     def __init__(self, lib_storage, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.lib_storage = lib_storage
@@ -323,19 +365,27 @@ class ScanWindow(Gtk.ApplicationWindow):
         self.builder = WindowBuilder(XML_DIR / 'scan.xml', {})
         self.set_child(self.builder.root_widget)
         
-        self.task_list = TaskListView()
-        self.builder.books.append(self.task_list.view)
+        #self.task_list = TaskListView()
+        #self.builder.books.append(self.task_list.view)
 
         run_func_in_thread(self.fg_scan)
 
     def progress_count_scanned_files(self, count_scanned_files):
         self.builder.count_scanned_files.props.label = str(count_scanned_files)
 
-    def add_dublicate_file_frame(self, existed_filepath, inserted_filepath, file_hash):
-        print(file_hash)
-        print('    ', existed_filepath)
-        print('    ', inserted_filepath)
-        self.task_list.append(1, existed_filepath, inserted_filepath)
+    def add_dublicate_file_frame(self, status, existed_filepath, inserted_filepath, file_hash):
+        if status == STATUS_UNTOUCHED:
+            return
+
+        builder = WindowBuilder(XML_DIR / self.task_item_widgets[status], {})
+        if hasattr(builder, 'inserted_path'):
+            builder.inserted_path.props.label = inserted_filepath
+
+        if hasattr(builder, 'existed_path'):
+            builder.existed_path.props.label = existed_filepath
+
+        self.builder.books.append(builder.root_widget)
+        #self.task_list.append(status, existed_filepath, inserted_filepath)
     
     #def fg_finish(self):
     #    self.lib_storage.db.reopen()
@@ -346,7 +396,7 @@ class ScanWindow(Gtk.ApplicationWindow):
             config.storage_books,
             'original',
             progress_count_scanned_files=self.progress_count_scanned_files,
-            func_dublicate=self.add_dublicate_file_frame,
+            func=self.add_dublicate_file_frame,
         )
         #GLib.idle_add(self.fg_finish)
 

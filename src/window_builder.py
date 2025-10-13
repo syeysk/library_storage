@@ -64,10 +64,14 @@ class WindowBuilder:
                     gtkelem.set_markup(node.text)
                 elif attr_name == 'vexpand':
                     gtkelem.set_vexpand(True)
+                elif attr_name == 'hexpand':
+                    gtkelem.set_hexpand(True)
                 else:
                     if attr_name in {'selected', 'xalign', 'spacing', 'margin_top', 'margin_start', 'margin_bottom', 'margin_end', 'column_spacing', 'row_spacing', 'max_content_height'}:
                         attr_value = int(attr_value) if attr_value else 0
-
+                    elif attr_name in {'sensitive'}:
+                        attr_value = True if attr_value == 'True' else False
+                    
                     setattr(gtkelem.props, attr_name, attr_value)
         
             if self.parents:
