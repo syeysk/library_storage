@@ -1,0 +1,13 @@
+<?xml version="1.1" encoding="UTF-8" ?>
+<Grid margin_top="6" margin_start="6" margin_end="6" margin_bottom="6">
+	<Row>
+	    <Label xalign="0" id="title"></Label>
+	</Row>
+	<Row>
+	    <Label xalign="0" id="path"></Label>
+	</Row>
+	<Row>
+	    <!--<Button id="button">Все теги</Button>-->
+		<Box id="tags" orientation="HORIZONTAL"></Box>
+	</Row>
+</Grid>

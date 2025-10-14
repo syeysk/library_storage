@@ -49,6 +49,10 @@ class DBStorage:
             id INTEGER PRIMARY KEY,
             name VARCHAR(255),
             parent INTEGER DEFAULT NULL
+        );
+        CREATE TABLE IF NOT EXISTS file_tag (
+            file_id INTEGER NOT NULL,
+            tag_id INTEGER NOT NULL
         );'''
     SQL_DELETE_FILE = 'DELETE FROM files WHERE hash=?'
     SQL_UPDATE_SET_IS_DELETED_FOR_ALL = 'UPDATE files SET is_deleted=1'
@@ -60,6 +64,11 @@ class DBStorage:
     SQL_SELECT_TAGS_NULL = 'SELECT id, name FROM tags WHERE parent IS NULL'
     SQL_SELECT_ALL_TAGS = 'SELECT id, name, parent FROM tags'
     SQL_SELECT_TAG = 'SELECT name, parent FROM tags WHERE id=?'
+    
+    SQL_SELECT_TAGS_BY_FILE = 'SELECT tags.name, tags.id FROM file_tag INNER JOIN tags ON file_tag.tag_id = tags.id WHERE file_tag.file_id=? ORDER BY tags.name'
+    SQL_INSERT_TAG_TO_FILE = 'INSERT INTO file_tag (file_id, tag_id) VALUES (?, ?)'
+    SQL_CHECK_TAG_FILE = 'SELECT 1 FROM file_tag WHERE file_id=? AND tag_id=? LIMIT 1'
+    SQL_DELETE_TAG_FROM_FILE = 'DELETE FROM file_tag WHERE file_id=? AND tag_id=?'
 
     def insert_tag(self, name, parent=None):
         self.cu.execute(self.SQL_INSERT_TAG, (name, parent))
@@ -79,6 +88,24 @@ class DBStorage:
 
     def select_tag(self, tag_id):
         return self.cu.execute(self.SQL_SELECT_TAG, (tag_id,)).fetchone()
+
+    def select_tags_by_file(self, file_id):
+        for row in self.cu.execute(self.SQL_SELECT_TAGS_BY_FILE, (file_id,)).fetchall():
+            yield row
+
+    def assign_tag(self, tag_id, file_id):
+        sql_params = (file_id, tag_id)
+        if self.cu.execute(self.SQL_CHECK_TAG_FILE, sql_params).fetchone():
+            return False
+
+        self.cu.execute(self.SQL_INSERT_TAG_TO_FILE, sql_params)
+        self.c.commit()
+        return True
+
+    def unassign_tag(self, tag_id, file_id):
+        sql_params = (file_id, tag_id)
+        self.cu.execute(self.SQL_DELETE_TAG_FROM_FILE, sql_params)
+        self.c.commit()
 
     def __init__(self, db_path: Path) -> None:
         self.db_path = db_path

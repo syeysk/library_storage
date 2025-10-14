@@ -4,6 +4,7 @@ from pathlib import Path
 from threading import Thread
 
 import gi
+gi.require_version("Gdk", "4.0")
 gi.require_version('Gtk', '4.0')
 from gi.repository import GLib, Gio, Gtk, GObject, Gdk
 
@@ -20,58 +21,35 @@ MENU_MAIN_PATH = XML_DIR / 'menu_main.xml'
 
 
 def run_func_in_thread(func, args=(), kwargs=None, finish_func=None, finish_args=()):
-    '''def check():
-        if thread.is_alive():
-            print('поток продолжается')
-            #self.after(100, check)
-        else:
-            print('поток завершён')
-            # action after finishing thread
-            if finish_func:
-                finish_func(*finish_args)'''
-
     thread = Thread(group=None, target=func, args=args, kwargs=kwargs)
     thread.start()
-    #check()
 
-'''
-class Task(GObject.Object):
-    __gtype_name__ = 'Task'
-    
-    def __init__(self, status, inserted_path, existed_path):
-        super().__init__()
-        self._status = status
-        self._inserted_path = inserted_path
-        self._existed_path = existed_path
-
-    @GObject.Property(type=str)
-    def status(self):
-        return self._status
-
-    @GObject.Property(type=str)
-    def inserted_path(self):
-        return self._inserted_path
-
-    @GObject.Property(type=str)
-    def existed_path(self):
-        return self._existed_path
-'''
 
 class Book(GObject.Object):
     __gtype_name__ = 'Book'
     
-    def __init__(self, book_id, book_path):
+    def __init__(self, book_id, title, path, tags):
         super().__init__()
         self._book_id = book_id
-        self._book_path = book_path
+        self._path = path
+        self._title = title
+        self._tags = tags
 
     @GObject.Property(type=int)
     def book_id(self):
         return self._book_id
 
     @GObject.Property(type=str)
-    def book_path(self):
-        return self._book_path
+    def path(self):
+        return self._path
+
+    @GObject.Property(type=str)
+    def title(self):
+        return self._title
+
+    @GObject.Property(type=str)
+    def tags(self):
+        return self._tags
 
 
 class Tag(GObject.Object):
@@ -105,122 +83,58 @@ class Tag(GObject.Object):
     def get_children(self):
         return self._children
 
-'''
-class TaskListView:
-    task_item_widgets = {
-        STATUS_NEW: 'task_new.xml',
-        STATUS_MOVED: 'task_moved.xml',
-        STATUS_RENAMED: 'task_moved.xml',
-        STATUS_MOVED_AND_RENAMED: 'task_moved.xml',
-        STATUS_UNTOUCHED: 'task_untouched.xml',
-        STATUS_DELETED: 'task_deleted.xml',
-        STATUS_DUPLICATE: 'task_duplicate.xml',
-    }
-
-    def _on_factory_setup(self, factory, list_item):
-        builder = WindowBuilder(XML_DIR / self.task_item_widgets[STATUS_MOVED], {})
-        cell = builder.root_widget
-        cell.builder = builder
-
-        if hasattr(builder, 'inserted_path'):
-            builder.inserted_path._binding = None
-
-        if hasattr(builder, 'existed_path'):
-            builder.existed_path._binding = None
-
-        builder.title._binding = None
-        list_item.set_child(cell)
-
-    def _on_factory_bind(self, factory, list_item):
-        cell = list_item.get_child()
-        item = list_item.get_item()
-
-        if hasattr(cell.builder, 'existed_path'):
-            existed_label = cell.builder.existed_path
-            existed_label._binding = item.bind_property('existed_path', existed_label, 'label', GObject.BindingFlags.SYNC_CREATE)
-
-        if hasattr(cell.builder, 'inserted_path'):
-            inserted_label = cell.builder.inserted_path
-            inserted_label._binding = item.bind_property('inserted_path', inserted_label, 'label', GObject.BindingFlags.SYNC_CREATE)
-
-        title_label = cell.builder.title
-        title_label._binding = item.bind_property('status', title_label, 'label', GObject.BindingFlags.SYNC_CREATE)
-
-    def _on_factory_unbind(self, factory, list_item):
-        cell = list_item.get_child()
-        
-        if hasattr(cell.builder, 'existed_path'):
-            existed_label = cell.builder.existed_path
-            if existed_label._binding:
-                existed_label._binding.unbind()
-                existed_label._binding = None
-
-        if hasattr(cell.builder, 'inserted_path'):
-            inserted_label = cell.builder.inserted_path
-            if inserted_label._binding:
-                inserted_label._binding.unbind()
-                inserted_label._binding = None
-
-        title_label = cell.builder.title
-        if title_label._binding:
-            title_label._binding.unbind()
-            title_label._binding = None
-
-
-    def _on_factory_teardown(self, factory, list_item):
-        cell = list_item.get_child()
-        #cell._binding = None
-
-    def __init__(self):
-        factory = Gtk.SignalListItemFactory()
-        factory.connect('setup', self._on_factory_setup)
-        factory.connect('bind', self._on_factory_bind)
-        factory.connect('unbind', self._on_factory_unbind)
-        factory.connect("teardown", self._on_factory_teardown)
-
-        self.list_store = Gio.ListStore(item_type=Task)
-        selection = Gtk.SingleSelection(model=self.list_store)
-        self.view = Gtk.ListView(model=selection, factory=factory)
-        self.view.connect('activate', self.on_activate_item)
-
-    def append(self, status, inserted_path, existed_path):
-        item = Task(status, inserted_path, existed_path)
-        self.list_store.append(item)
-
-    def clear(self):
-        self.list_store.remove_all()
-
-    def on_activate_item(self, column_view, position):
-        item = self.list_store.get_item(position)
-'''
 
 class BookListView:
     def _on_factory_setup(self, factory, list_item):
-        cell = Gtk.Box()
-        cell.props.orientation = Gtk.Orientation.VERTICAL
-        label = Gtk.Label()
-        label.props.xalign = 0
-        cell.append(label)
-        cell.l = label
-        cell.l._binding = None
+        builder = WindowBuilder(XML_DIR / 'item_book.xml', {})
+        cell = builder.root_widget
+        cell.builder = builder
+        
+        builder.title._binding = None
+        builder.path._binding = None
         list_item.set_child(cell)
-
+        
     def _on_factory_bind(self, factory, list_item):
         cell = list_item.get_child()
         item = list_item.get_item()
-        cell.l._binding = item.bind_property('book_path', cell.l, 'label', GObject.BindingFlags.SYNC_CREATE)
+        cell.builder.title._binding = item.bind_property('title', cell.builder.title, 'label', GObject.BindingFlags.SYNC_CREATE)
+        cell.builder.path._binding = item.bind_property('path', cell.builder.path, 'label', GObject.BindingFlags.SYNC_CREATE)
+
+        self.book_widgets[item.book_id] = cell
+        self.populate_tags(item)
+
+        # https://pygobject.gnome.org/tutorials/gtk4/drag-and-drop.html
+        # https://www.opennet.ru/docs/RUS/gtk-reference/gtk-Drag-and-Drop.html
+        # https://docs.gtk.org/gtk4/drag-and-drop.html
+        drop_controller = Gtk.DropTarget.new(
+            type=GObject.TYPE_NONE, actions=Gdk.DragAction.COPY
+        )
+        drop_controller.set_gtypes([Tag])
+        drop_controller.connect("drop", self.on_drop, item)
+        cell.add_controller(drop_controller)
+
+    def on_drop(self, _ctrl, value, _x, _y, file_item):
+        if isinstance(value, Tag):
+            self.lib_storage.db.assign_tag(value.tag_id, file_item.book_id)
+            self.populate_tags(file_item)
 
     def _on_factory_unbind(self, factory, list_item):
         cell = list_item.get_child()
-        if cell.l._binding:
-            cell.l._binding.unbind()
-            cell.l._binding = None
+        if cell.builder.title._binding:
+            cell.builder.title._binding.unbind()
+            cell.builder.title._binding = None
+
+        if cell.builder.path._binding:
+            cell.builder.path._binding.unbind()
+            cell.builder.path._binding = None
 
     def _on_factory_teardown(self, factory, list_item):
         cell = list_item.get_child()
         #cell._binding = None
 
-    def __init__(self):
+    def __init__(self, parent, lib_storage):
+        self.lib_storage = lib_storage
+        self.parent = parent
         factory = Gtk.SignalListItemFactory()
         factory.connect('setup', self._on_factory_setup)
         factory.connect('bind', self._on_factory_bind)
@@ -232,9 +146,34 @@ class BookListView:
         self.view = Gtk.ListView(model=selection, factory=factory)
         self.view.connect('activate', self.on_activate_item)
 
+        self.book_widgets = {}
+
     def append(self, book_id, book_path):
-        item = Book(book_id, Path(book_path).name)
+        path = Path(book_path)
+        item = Book(book_id, path.name, path.parent, '')
         self.list_store.append(item)
+        self.populate_tags(item)
+    
+    def delete_tag(self, _, book, tag_id):
+        self.lib_storage.db.unassign_tag(tag_id, book.book_id)
+        self.populate_tags(book)
+
+    def populate_tags(self, book):
+        tags = self.book_widgets[book.book_id].builder.tags
+        while tags.get_first_child():
+            tags.remove(tags.get_first_child())
+
+        for tag_name, tag_id in self.lib_storage.db.select_tags_by_file(book.book_id):
+            box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+            box.props.margin_end = 6
+
+            label = Gtk.Label(label=tag_name)
+            button = Gtk.Button(label='x')
+            button.connect('clicked', self.delete_tag, book, tag_id)
+            
+            box.append(label)
+            box.append(button)
+            tags.append(box)
 
     def clear(self):
         self.list_store.remove_all()
@@ -279,6 +218,19 @@ class TagTreeView:
             #else:
             #    tree_expander.set_indent_for_row(False)
 
+        full_cell = list_item.get_child()
+        drag_controller = Gtk.DragSource()
+        drag_controller.connect("prepare", self.on_drag_prepare, item)
+        drag_controller.connect("drag-begin", self.on_drag_begin, full_cell)
+        full_cell.add_controller(drag_controller)
+
+    def on_drag_prepare(self, _ctrl, _x, _y, item):
+        item_value = Gdk.ContentProvider.new_for_value(item)
+        return Gdk.ContentProvider.new_union([item_value])
+
+    def on_drag_begin(self, ctrl, _drag, full_cell):
+        icon = Gtk.WidgetPaintable.new(full_cell)
+        ctrl.set_icon(icon, 0, 0)
 
     def _on_factory_setup_checked(self, factory, list_item):
         cell = Gtk.CheckButton(label='')
@@ -492,7 +444,7 @@ class AppWindow(Gtk.ApplicationWindow):
         self.builder.scrolled_books.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         self.builder.scrolled_books.set_propagate_natural_height(True)
 
-        self.book_list = BookListView()
+        self.book_list = BookListView(self, self.lib_storage)
         self.builder.books.append(self.book_list.view)
         
         self.update_book_list()
