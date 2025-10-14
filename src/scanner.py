@@ -35,8 +35,6 @@ class DBStorage:
     SQL_INSERT_ROW_WITH_ID = 'INSERT INTO files (hash, id, directory, filename) VALUES (?, ?, ?, ?)'
     SQL_SELECT_FILE = 'SELECT directory, filename, is_deleted FROM files WHERE hash=?'
     SQL_SELECT_COUNT_ROWS = 'SELECT COUNT(id) FROM files WHERE is_deleted = 0'
-    SQL_SELECT_ROWS = 'SELECT hash, id, directory, filename FROM files WHERE is_deleted = 0 LIMIT ?,?'
-    SQL_SELECT_ROWS_ONLY_DELETED = 'SELECT hash, id, directory, filename FROM files WHERE is_deleted=1 LIMIT ?,?'
     SQL_CREATE_TABLE = '''
         CREATE TABLE IF NOT EXISTS files (
             hash VARCHAR(64) UNIQUE,
@@ -174,12 +172,32 @@ class DBStorage:
         self.c.commit()
         self.seq_sql_params.clear()
 
-    def select_rows(self, only_deleted=False):
-        sql = self.SQL_SELECT_ROWS_ONLY_DELETED if only_deleted else self.SQL_SELECT_ROWS
+    def select_rows(self, tags=None, only_deleted=False):
+        sql_params = []
+        sql = ['SELECT files.hash, files.id, files.directory, files.filename FROM files']
+        sql_where = []
+        
+        if tags:
+            sql.append('JOIN file_tag ON files.id = file_tag.file_id')
+        
+        if tags:
+            sql_where.append('file_tag.tag_id IN (%s)' % ', '.join('?'*len(tags)))
+            sql_params.extend(tags)
+
+        if only_deleted:
+            sql_where.append('files.is_deleted = 1')
+
+        if sql_where:
+            sql.append('WHERE')
+            sql.append(' AND '.join(sql_where))
+
+        sql.append('GROUP BY files.id ORDER BY files.filename LIMIT ?,?')
+        sql = ' '.join(sql)
+
         count_pages = self.get_count_pages()
         for page_num in range(count_pages):
-            sql_params = (page_num * self.COUNT_ROWS_ON_PAGE, self.COUNT_ROWS_ON_PAGE)
-            for row in self.cu.execute(sql, sql_params).fetchall():
+            all_sql_params = [*sql_params, page_num * self.COUNT_ROWS_ON_PAGE, self.COUNT_ROWS_ON_PAGE]
+            for row in self.cu.execute(sql, all_sql_params).fetchall():
                 yield row
 
     def set_is_deleted_for_all(self):
@@ -208,10 +226,6 @@ class DBStorage:
 
     def update(self, file_hash, inserted_directory, inserted_filename):
         self.cu.execute(self.SQL_UPDATE_FILE, (inserted_directory, inserted_filename, file_hash))
-
-    def get_filepath(self, file_hash):
-        existed_directory, existed_filename, _ = self.cu.execute(self.SQL_SELECT_FILE, (file_hash,)).fetchone()
-        return f'{existed_directory}/{existed_filename}' if existed_directory else existed_filename
 
 
 class LibraryStorage:

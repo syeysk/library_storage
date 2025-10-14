@@ -172,6 +172,7 @@ class BookListView:
 
     def clear(self):
         self.list_store.remove_all()
+        self.book_widgets.clear()
 
     def on_activate_item(self, column_view, position):
         item = self.list_store.get_item(position)
@@ -237,6 +238,11 @@ class TagTreeView:
         cell = list_item.get_child()
         item = list_item.get_item()
         cell._binding = item.bind_property('checked', cell, 'active', GObject.BindingFlags.SYNC_CREATE)
+        cell.connect('toggled', self.click_tag, item.tag_id, cell)
+
+    def click_tag(self, _, tag_id, widget):
+        self.tag_binded_values[tag_id] = widget.props.active
+        self.func_toggled_tag(tag_id, self.tag_binded_values)
 
     def _on_factory_unbind(self, factory, list_item):
         cell = list_item.get_child()
@@ -254,7 +260,8 @@ class TagTreeView:
 
         return None
 
-    def __init__(self):
+    def __init__(self, func_toggled_tag):
+        self.func_toggled_tag = func_toggled_tag
         self.list_store = Gio.ListStore(item_type=Tag)
         # https://api.pygobject.gnome.org/Gtk-4.0/class-TreeListModel.html
         self.tree_store = Gtk.TreeListModel.new(self.list_store, True, True, self.get_children)
@@ -280,6 +287,7 @@ class TagTreeView:
         self.view.append_column(column_checked)
         
         self.tags = {}
+        self.tag_binded_values = {}
 
     def append(self, tag_id, name, checked, parent_id=None):
         if parent_id:
@@ -291,6 +299,7 @@ class TagTreeView:
             self.list_store.append(tag)
 
         self.tags[tag_id] = tag
+        self.tag_binded_values[tag_id] = tag.checked
 
 
 class ScanWindow(Gtk.ApplicationWindow):
@@ -429,7 +438,7 @@ class AppWindow(Gtk.ApplicationWindow):
         self.builder.scrolled_tags.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         self.builder.scrolled_tags.set_propagate_natural_height(True)
         
-        self.tag_tree = TagTreeView()
+        self.tag_tree = TagTreeView(self.toggled_tag)
         self.builder.tags.append(self.tag_tree.view)
 
         self.build_tags()
@@ -443,16 +452,19 @@ class AppWindow(Gtk.ApplicationWindow):
         self.builder.books.append(self.book_list.view)
         
         self.update_book_list()
-    
-    def update_book_list(self, _=None):
+ 
+    def toggled_tag(self, tag_id, all_tags):
+        self.update_book_list(tags=[str(key) for key, value in all_tags.items() if value])
+ 
+    def update_book_list(self, _=None, tags=None):
         self.book_list.clear()
-        for book_hash, book_id, directory, filename in self.lib_storage.db.select_rows():
+        for book_hash, book_id, directory, filename in self.lib_storage.db.select_rows(tags):
             self.book_list.append(book_id, Path(directory) / filename)
 
     def build_tags(self, parent_id=None):
         parents = []
         for tag_id, tag_name in self.lib_storage.db.select_tags(parent_id):
-            self.tag_tree.append(tag_id, tag_name, True, parent_id)
+            self.tag_tree.append(tag_id, tag_name, False, parent_id)
             parents.append(tag_id)
 
         for next_parent in parents:
