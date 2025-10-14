@@ -28,12 +28,11 @@ def run_func_in_thread(func, args=(), kwargs=None, finish_func=None, finish_args
 class Book(GObject.Object):
     __gtype_name__ = 'Book'
     
-    def __init__(self, book_id, title, path, tags):
+    def __init__(self, book_id, title, path):
         super().__init__()
         self._book_id = book_id
         self._path = path
         self._title = title
-        self._tags = tags
 
     @GObject.Property(type=int)
     def book_id(self):
@@ -46,10 +45,6 @@ class Book(GObject.Object):
     @GObject.Property(type=str)
     def title(self):
         return self._title
-
-    @GObject.Property(type=str)
-    def tags(self):
-        return self._tags
 
 
 class Tag(GObject.Object):
@@ -150,7 +145,7 @@ class BookListView:
 
     def append(self, book_id, book_path):
         path = Path(book_path)
-        item = Book(book_id, path.name, path.parent, '')
+        item = Book(book_id, path.name, path.parent)
         self.list_store.append(item)
         self.populate_tags(item)
     

@@ -7,7 +7,6 @@
 	    <Label xalign="0" id="path"></Label>
 	</Row>
 	<Row>
-	    <!--<Button id="button">Все теги</Button>-->
 		<Box id="tags" orientation="HORIZONTAL"></Box>
 	</Row>
 </Grid>
