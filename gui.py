@@ -20,7 +20,7 @@ XML_DIR = BASE_DIR / 'xml'
 MENU_MAIN_PATH = XML_DIR / 'menu_main.xml'
 
 STYLE_CSS = '''
-grid#item-file {
+grid#item-file, grid#item-task {
     background-color: #f0f0f0;
     border: 1px solid #ccc;
     padding: 10px;
@@ -371,6 +371,7 @@ class ScanWindow(Gtk.ApplicationWindow):
         if status == STATUS_DUPLICATE:
             builder.button_inserted.connect('clicked', self.delete_duplicate, builder, inserted_filepath)
 
+        builder.root_widget.set_name('item-task')
         self.builder.books.append(builder.root_widget)
         #self.task_list.append(status, existed_filepath, inserted_filepath)
     

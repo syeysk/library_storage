@@ -270,11 +270,11 @@ class LibraryStorage:
                 if process_dublicate == 'original':
                     if status in {STATUS_MOVED, STATUS_RENAMED, STATUS_MOVED_AND_RENAMED}:
                         self.db.update(file_hash, inserted_directory, inserted_filename)
-                    elif status == STATUS_DUPLICATE:
-                        print(self.MESSAGE_DOUBLE.format(existed_path, inserted_path))
-                elif process_dublicate == 'copy':
-                    if not is_deleted:  # для прохождения тестов
-                        print(self.MESSAGE_DOUBLE.format(existed_path, inserted_path))
+                #    elif status == STATUS_DUPLICATE:
+                #        print(self.MESSAGE_DOUBLE.format(existed_path, inserted_path))
+                #elif process_dublicate == 'copy':
+                #    if not is_deleted:  # для прохождения тестов
+                #        print(self.MESSAGE_DOUBLE.format(existed_path, inserted_path))
 
             if func:
                 func(status, existed_path, inserted_path, file_hash)
