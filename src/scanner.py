@@ -368,11 +368,11 @@ class LibraryStorage:
 
         self.db.insert_rows(func=process_file_status)
 
-        with open(os.path.join(exporter.storage_structure, 'tags.csv'), 'r', encoding='utf-8', newline='\n') as csv_file:
+        with open(os.path.join(csv_path, 'tags.csv'), 'r', encoding='utf-8', newline='\n') as csv_file:
             for csv_row in csv.reader(csv_file):
                 self.db.import_tag(*csv_row)
 
-        with open(os.path.join(exporter.storage_structure, 'tags-files.csv'), 'r', encoding='utf-8', newline='\n') as csv_file:
+        with open(os.path.join(csv_path, 'tags-files.csv'), 'r', encoding='utf-8', newline='\n') as csv_file:
             for csv_row in csv.reader(csv_file):
                 self.db.import_tag_file(*csv_row)
 
