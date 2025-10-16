@@ -19,6 +19,18 @@ from src.config import BASE_DIR, config
 XML_DIR = BASE_DIR / 'xml'
 MENU_MAIN_PATH = XML_DIR / 'menu_main.xml'
 
+STYLE_CSS = '''
+grid#item-file {
+    background-color: #f0f0f0;
+    border: 1px solid #ccc;
+    padding: 10px;
+    border-radius: 5px;
+}
+label#item-file-title {
+    font-size: 16pt;
+}
+'''
+
 
 def run_func_in_thread(func, args=(), kwargs=None, finish_func=None, finish_args=()):
     thread = Thread(group=None, target=func, args=args, kwargs=kwargs)
@@ -84,10 +96,15 @@ class BookListView:
         builder = WindowBuilder(XML_DIR / 'item_book.xml', {})
         cell = builder.root_widget
         cell.builder = builder
-        
+
+        builder.title.props.use_markup = True
+        builder.title.props.margin_bottom = 10
         builder.title._binding = None
         builder.path._binding = None
         list_item.set_child(cell)
+
+        builder.root_widget.set_name('item-file')
+        builder.title.set_name('item-file-title')
         
     def _on_factory_bind(self, factory, list_item):
         cell = list_item.get_child()
@@ -490,6 +507,16 @@ class MyApplication(Gtk.Application):
         super().__init__(application_id='org.syeysk.LibraryStorage')
         GLib.set_application_name('Library storage scanner')
         self.lib_storage = lib_storage
+
+        css_provider = Gtk.CssProvider()
+        css_provider.load_from_string(STYLE_CSS)
+        display = Gdk.Display.get_default()
+        Gtk.StyleContext.add_provider_for_display(
+            display,
+            css_provider,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
+
 
     def do_startup(self):
         Gtk.Application.do_startup(self)
