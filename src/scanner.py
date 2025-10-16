@@ -53,6 +53,7 @@ class DBStorage:
             tag_id INTEGER NOT NULL
         );'''
     SQL_DELETE_FILE = 'DELETE FROM files WHERE hash=?'
+    SQL_DELETE_FILES = 'DELETE FROM files WHERE id IN (%s)'
     SQL_UPDATE_SET_IS_DELETED_FOR_ALL = 'UPDATE files SET is_deleted=1'
     SQL_UPDATE_SET_IS_DELETED = 'UPDATE files SET is_deleted=0 WHERE hash=?'
     SQL_UPDATE_FILE = 'UPDATE files SET directory=?, filename=? WHERE hash=?'
@@ -171,7 +172,7 @@ class DBStorage:
         self.c.commit()
         self.seq_sql_params.clear()
 
-    def select_rows(self, tags=None, only_deleted=False):
+    def select_rows(self, tags=None, only_deleted=False, order_by='files.filename'):
         sql_params = []
         sql = ['SELECT files.hash, files.id, files.directory, files.filename FROM files']
         sql_where = []
@@ -190,7 +191,7 @@ class DBStorage:
             sql.append('WHERE')
             sql.append(' AND '.join(sql_where))
 
-        sql.append('GROUP BY files.id ORDER BY files.filename LIMIT ?,?')
+        sql.append(f'GROUP BY files.id ORDER BY {order_by} LIMIT ?,?')
         sql = ' '.join(sql)
 
         count_pages = self.get_count_pages()
@@ -206,11 +207,12 @@ class DBStorage:
     def set_is_not_deleted(self, file_hash):
         self.cu.execute(self.SQL_UPDATE_SET_IS_DELETED, (file_hash,))
 
-    def print_deleted_files(self, func):
+    def process_deleted_files(self, func):
         for file_hash, file_id, existed_directory, existed_filename in self.select_rows(only_deleted=True):
             existed_path = '{}/{}'.format(existed_directory, existed_filename)  # .removeprefix('/')
             existed_path = existed_path[1:] if existed_path.startswith('/') else existed_path
-            func(STATUS_DELETED, existed_path, None, file_hash, file_id)
+            if func:
+                func(STATUS_DELETED, existed_path, None, file_hash)
 
     def delete_file(self, file_hash):
         self.cu.execute(self.SQL_DELETE_FILE, (file_hash, ))
@@ -294,8 +296,7 @@ class LibraryStorage:
                     self.db.insert_rows(with_id=False, func=process_file_status)
 
         self.db.insert_rows(with_id=False, func=process_file_status)
-        # print('Обнаружено файлов:', total_count_files, 'шт')
-        #self.db.print_deleted_files(process_file_status)
+        self.db.process_deleted_files(func)
 
     def export_db(self, exporter, progress_count_exported_files=None) -> None:
         """
@@ -307,7 +308,7 @@ class LibraryStorage:
         number_of_last_row_on_current_page = self.CSV_COUNT_ROWS_ON_PAGE
         count_rows = self.db.get_count_rows()
         index_of_current_row = None
-        for index_of_current_row, row in enumerate(self.db.select_rows()):
+        for index_of_current_row, row in enumerate(self.db.select_rows(order_by='files.id')):
             number_of_last_row_on_current_page = number_of_last_row_on_current_page - row[1] + 1
             if index_of_current_row >= number_of_last_row_on_current_page:
                 exporter.close(is_last_page=index_of_current_row == count_rows - 1)
@@ -325,14 +326,14 @@ class LibraryStorage:
 
         exporter.close(is_last_page=index_of_current_row is None or index_of_current_row == count_rows - 1)
 
-        for row in self.db.select_all_tags():
-            exporter.write_tag_row(*row)
+        #for row in self.db.select_all_tags():
+        #    exporter.write_tag_row(*row)
 
-        exporter.close_tags()
+        #exporter.close_tags()
 
     def import_csv_to_db(self, csv_path):
         def process_file_status(*args):
-            status, existed_path, inserted_path = self.get_file_status(*args)
+            status, existed_path, inserted_path = self.get_file_status(*args[:4])
             if args[2]:
                 raise Exception(self.MESSAGE_DOUBLE_IMPORT.format(inserted_path, existed_path))
 

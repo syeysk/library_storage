@@ -2,8 +2,8 @@ from unittest.mock import patch
 
 from pyfakefs.fake_filesystem_unittest import TestCase
 
-from library_storage_scanner.exporters import CSVExporter
-from library_storage_scanner.scanner import DBStorage, LibraryStorage
+from src.exporters import CSVExporter
+from src.scanner import DBStorage, LibraryStorage, STATUS_DUPLICATE
 from tests.library_storage_fabric import LibraryStorageFabric
 
 ORIGIN_DIFF_CSV = (
@@ -36,12 +36,18 @@ class CoreTestCase(TestCase):
         self.origin_ls.set_db(DBStorage(':memory:'))
         self.copy_ls = LibraryStorage()
         self.copy_ls.set_db(DBStorage(':memory:'))
+        self.maxDiff = None
+        self.results = []
 
     def tearDown(self):
         self.origin_ls.__exit__(None, None, None)
         self.copy_ls.__exit__(None, None, None)
+        self.results.clear()
 
-    @patch('library_storage_scanner.scanner.get_file_hash', mock_get_file_hash)
+    def func(self, status, existed_path, inserted_path, file_hash):
+        self.results.append((status, existed_path, inserted_path))
+
+    @patch('src.scanner.get_file_hash', mock_get_file_hash)
     def test_duplicate_in_origin(self):
         origin_fs = (
             ('/file01.txt', 'content01'),
@@ -59,17 +65,10 @@ class CoreTestCase(TestCase):
         origin_storage.generate_db(excludes=['/directory01111/duplicate.txt'])
         self.create_files(origin_fs, library_path)
 
-        with patch('builtins.print') as mock_print:
-            self.origin_ls.scan_to_db(library_path=library_path, process_dublicate='original')
-            data_origin = self.origin_ls.db.cu.execute('select * from files').fetchall()
-            self.assertEqual(origin_storage.db, data_origin)
-            self.assertEqual(1, mock_print.call_count)
-            self.assertEqual(
-                'Обнаружен дубликат по хешу:\n'
-                '   В базе: directory01/file04.txt\n'
-                '    Дубль: directory01111/duplicate.txt',
-                mock_print.mock_calls[0].args[0],
-            )
+        self.origin_ls.scan_to_db(library_path=library_path, process_dublicate='original', func=self.func)
+        data_origin = self.origin_ls.db.cu.execute('select * from files').fetchall()
+        self.assertEqual(origin_storage.db, data_origin)
+        self.assertIn((STATUS_DUPLICATE, 'directory01/file04.txt', 'directory01111/duplicate.txt'), self.results)
 
     def test_duplicate_in_copy(self):
         origin_fs = (
@@ -128,7 +127,7 @@ class CoreTestCase(TestCase):
         data_origin = self.origin_ls.db.cu.execute('select * from files').fetchall()
         self.assertEqual(origin_db, data_origin)
 
-        self.origin_ls.export_db_to_csv(CSVExporter('/struct', None))
+        self.origin_ls.export_db(CSVExporter('/struct', None))
         with open('/struct/1.csv') as struct:
             self.assertEqual(origin_struct_1, struct.read())
 
@@ -136,14 +135,7 @@ class CoreTestCase(TestCase):
         data_copy = self.copy_ls.db.cu.execute('select * from files').fetchall()
         self.assertEqual(origin_db, data_copy)
 
-        with patch('builtins.print') as mock_print:
-            self.copy_ls.scan_to_db(library_path='/copy', process_dublicate='copy')
-            data_copy = self.copy_ls.db.cu.execute('select * from files').fetchall()
-            self.assertEqual(copy_db, data_copy)
-            self.assertEqual(1, mock_print.call_count)
-            self.assertEqual(
-                f'Обнаружен дубликат по хешу:\n'
-                '   В базе: file05.txt\n'
-                '    Дубль: directory01/duplicate.txt',
-                mock_print.mock_calls[0].args[0],
-            )
+        self.copy_ls.scan_to_db(library_path='/copy', process_dublicate='copy', func=self.func)
+        data_copy = self.copy_ls.db.cu.execute('select * from files').fetchall()
+        self.assertEqual(copy_db, data_copy)
+        self.assertIn((STATUS_DUPLICATE, 'file05.txt', 'directory01/duplicate.txt'), self.results)

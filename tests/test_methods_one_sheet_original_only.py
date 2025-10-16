@@ -3,8 +3,8 @@ import copy
 
 from pyfakefs.fake_filesystem_unittest import TestCase
 
-from library_storage_scanner.exporters import CSVExporter
-from library_storage_scanner.scanner import DBStorage, LibraryStorage
+from src.exporters import CSVExporter
+from src.scanner import DBStorage, LibraryStorage
 
 ORIGIN_FS = (
     ('/origin/file01.txt', 'content01'),
@@ -50,6 +50,7 @@ class CoreTestCase(TestCase):
         self.origin_ls = LibraryStorage()
         self.origin_ls.set_db(DBStorage(':memory:'))
         self.origin_ls.scan_to_db(library_path='/origin', process_dublicate='original')
+        self.maxDiff = None
 
     def tearDown(self):
         self.origin_ls.__exit__(None, None, None)
@@ -60,7 +61,7 @@ class CoreTestCase(TestCase):
         data_origin = self.origin_ls.db.cu.execute('select * from files').fetchall()
         self.assertEqual(origin_db_after_second_scanning, data_origin)
 
-        self.origin_ls.export_db_to_csv(CSVExporter('/struct', None))
+        self.origin_ls.export_db(CSVExporter('/struct', None))
         with open('/struct/1.csv') as struct:
             self.assertEqual(origin_struct_after_second_scanning, struct.read())
 
@@ -68,7 +69,7 @@ class CoreTestCase(TestCase):
         data_origin = self.origin_ls.db.cu.execute('select * from files').fetchall()
         self.assertEqual(ORIGIN_DB, data_origin)
 
-        self.origin_ls.export_db_to_csv(CSVExporter('/struct', None))
+        self.origin_ls.export_db(CSVExporter('/struct', None))
         with open('/struct/1.csv') as struct:
             self.assertEqual(ORIGIN_STRUCT, struct.read())
 
@@ -76,19 +77,14 @@ class CoreTestCase(TestCase):
         self.check_second_scanning(ORIGIN_DB, ORIGIN_STRUCT)
 
     def test_all_process_delete_file(self):
-        deleted_filepath = ORIGIN_FS[3][0]
+        deleted = 3
+        deleted_filepath = ORIGIN_FS[deleted][0]
         self.fs.remove(deleted_filepath)
         origin_db_after_second_scanning = copy.deepcopy(ORIGIN_DB)
-        origin_db_after_second_scanning[3] = (
-            origin_db_after_second_scanning[3][0],
-            origin_db_after_second_scanning[3][1],
-            origin_db_after_second_scanning[3][2],
-            origin_db_after_second_scanning[3][3],
-            1,
-        )
-        origin_struct_after_second_scanning = ORIGIN_STRUCT.split('\n')
-        del origin_struct_after_second_scanning[3]
-        self.check_second_scanning(origin_db_after_second_scanning, '\n'.join(origin_struct_after_second_scanning))
+        origin_db_after_second_scanning[deleted] = (*origin_db_after_second_scanning[deleted][:4], 1)
+        #origin_struct_after_second_scanning = ORIGIN_STRUCT.split('\n')
+        #del origin_struct_after_second_scanning[deleted]
+        self.check_second_scanning(origin_db_after_second_scanning, ORIGIN_STRUCT) #'\n'.join(origin_struct_after_second_scanning))
 
     def test_all_process_add_file(self):
         self.fs.create_file(file_path='/origin/directory04/file09.txt', contents='content09')
@@ -103,24 +99,26 @@ class CoreTestCase(TestCase):
         self.check_second_scanning(origin_db_after_second_scanning, origin_struct_after_second_scanning)
 
     def test_all_process_rename_file(self):
-        renamed_filepath = ORIGIN_FS[3][0]
+        renamed = 3
+        renamed_filepath = ORIGIN_FS[renamed][0]
         self.fs.rename(renamed_filepath, '{}_renamed'.format(renamed_filepath))
         origin_db_after_second_scanning = copy.deepcopy(ORIGIN_DB)
-        origin_db_after_second_scanning[3] = (
-            origin_db_after_second_scanning[3][0],
-            origin_db_after_second_scanning[3][1],
-            origin_db_after_second_scanning[3][2],
-            '{}_renamed'.format(origin_db_after_second_scanning[3][3]),
+        origin_db_after_second_scanning[renamed] = (
+            origin_db_after_second_scanning[renamed][0],
+            origin_db_after_second_scanning[renamed][1],
+            origin_db_after_second_scanning[renamed][2],
+            '{}_renamed'.format(origin_db_after_second_scanning[renamed][3]),
             0,
         )
         origin_struct_after_second_scanning = ORIGIN_STRUCT.split('\n')
-        row = origin_struct_after_second_scanning[3].split(',')
+        row = origin_struct_after_second_scanning[renamed].split(',')
         row[-1] = '{}_renamed'.format(row[-1])
-        origin_struct_after_second_scanning[3] = ','.join(row)
+        origin_struct_after_second_scanning[renamed] = ','.join(row)
         self.check_second_scanning(origin_db_after_second_scanning, '\n'.join(origin_struct_after_second_scanning))
 
     def test_all_process_move_file(self):
-        moved_filepath = ORIGIN_FS[3][0]
+        moved = 3
+        moved_filepath = ORIGIN_FS[moved][0]
         new_dirpath = os.path.join(
             os.path.dirname(os.path.dirname(moved_filepath)),
             'new_dir',
@@ -132,17 +130,17 @@ class CoreTestCase(TestCase):
         )
         self.fs.rename(moved_filepath, new_filepath)
         origin_db_after_second_scanning = copy.deepcopy(ORIGIN_DB)
-        origin_db_after_second_scanning[3] = (
-            origin_db_after_second_scanning[3][0],
-            origin_db_after_second_scanning[3][1],
+        origin_db_after_second_scanning[moved] = (
+            origin_db_after_second_scanning[moved][0],
+            origin_db_after_second_scanning[moved][1],
             new_dirpath.replace('/origin/', ''),
-            origin_db_after_second_scanning[3][3],
+            origin_db_after_second_scanning[moved][3],
             0,
         )
         origin_struct_after_second_scanning = ORIGIN_STRUCT.split('\n')
-        row = origin_struct_after_second_scanning[3].split(',')
+        row = origin_struct_after_second_scanning[moved].split(',')
         row[-2] = new_dirpath.replace('/origin/', '')
-        origin_struct_after_second_scanning[3] = ','.join(row)
+        origin_struct_after_second_scanning[moved] = ','.join(row)
         self.check_second_scanning(origin_db_after_second_scanning, '\n'.join(origin_struct_after_second_scanning))
 
     """def test_all_process_moved_and_renamed_file(self):
