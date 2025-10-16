@@ -33,7 +33,7 @@ class DBStorage:
     COUNT_ROWS_ON_PAGE = 10
     SQL_INSERT_ROW = 'INSERT INTO files (hash, directory, filename) VALUES (?, ?, ?)'
     SQL_INSERT_ROW_WITH_ID = 'INSERT INTO files (hash, id, directory, filename) VALUES (?, ?, ?, ?)'
-    SQL_SELECT_FILE = 'SELECT directory, filename, is_deleted FROM files WHERE hash=?'
+    SQL_SELECT_FILE = 'SELECT directory, filename FROM files WHERE hash=?'
     SQL_SELECT_COUNT_ROWS = 'SELECT COUNT(id) FROM files WHERE is_deleted = 0'
     SQL_CREATE_TABLE = '''
         CREATE TABLE IF NOT EXISTS files (
@@ -153,11 +153,11 @@ class DBStorage:
             row = self.cu.execute(self.SQL_SELECT_FILE, (file_hash,)).fetchone()
             inserted_directory, inserted_filename = sql_params[2 if with_id else 1:]
             if row:
-                existed_directory, existed_filename, is_deleted = row
+                existed_directory, existed_filename = row
                 self.set_is_not_deleted(file_hash)
             else:
                 self.cu.execute(sql_insert, sql_params)
-                existed_directory, existed_filename, is_deleted = None, None, None
+                existed_directory, existed_filename = None, None
 
             if func:
                 func(
@@ -166,7 +166,6 @@ class DBStorage:
                     existed_directory,
                     existed_filename,
                     file_hash,
-                    is_deleted,
                 )
 
         self.c.commit()
@@ -263,18 +262,12 @@ class LibraryStorage:
                     inserted_filename,
                     existed_directory,
                     existed_filename,
-                    file_hash,
-                    is_deleted,):
+                    file_hash,):
             status, existed_path, inserted_path = self.get_file_status(inserted_directory, inserted_filename, existed_directory, existed_filename)
             if status != STATUS_NEW:
                 if process_dublicate == 'original':
                     if status in {STATUS_MOVED, STATUS_RENAMED, STATUS_MOVED_AND_RENAMED}:
                         self.db.update(file_hash, inserted_directory, inserted_filename)
-                #    elif status == STATUS_DUPLICATE:
-                #        print(self.MESSAGE_DOUBLE.format(existed_path, inserted_path))
-                #elif process_dublicate == 'copy':
-                #    if not is_deleted:  # для прохождения тестов
-                #        print(self.MESSAGE_DOUBLE.format(existed_path, inserted_path))
 
             if func:
                 func(status, existed_path, inserted_path, file_hash)
@@ -339,7 +332,7 @@ class LibraryStorage:
 
     def import_csv_to_db(self, csv_path):
         def process_file_status(*args):
-            status, existed_path, inserted_path = self.get_file_status(*args[:5])
+            status, existed_path, inserted_path = self.get_file_status(*args)
             if args[2]:
                 raise Exception(self.MESSAGE_DOUBLE_IMPORT.format(inserted_path, existed_path))
 
