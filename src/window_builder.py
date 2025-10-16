@@ -50,7 +50,7 @@ class WindowBuilder:
             #        kwargs['same'] = True
             #        node.attrib.pop('same')
             elif tag == 'Picture':
-                kwargs['filename'] = str(BASE_DIR / node.attrib.pop('filename'))
+                kwargs['filename'] = node.attrib.pop('filename')
             elif tag == 'Box':
                 kwargs['orientation'] = getattr(Gtk.Orientation, node.attrib.pop('orientation', 'VERTICAL'))
             
