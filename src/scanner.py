@@ -59,13 +59,17 @@ class DBStorage:
     SQL_UPDATE_FILE = 'UPDATE files SET directory=?, filename=? WHERE hash=?'
 
     SQL_INSERT_TAG = 'INSERT INTO tags (name, parent) VALUES (?, ?)'
+    SQL_IMPORT_TAG = 'INSERT INTO tags (id, name, parent) VALUES (?, ?, ?)'
     SQL_SELECT_TAGS = 'SELECT id, name FROM tags WHERE parent=?'
     SQL_SELECT_TAGS_NULL = 'SELECT id, name FROM tags WHERE parent IS NULL'
     SQL_SELECT_ALL_TAGS = 'SELECT id, name, parent FROM tags'
     SQL_SELECT_TAG = 'SELECT name, parent FROM tags WHERE id=?'
+
+    SQL_SELECT_ALL_TAG_FILE = 'SELECT file_id, tag_id FROM file_tag'
     
     SQL_SELECT_TAGS_BY_FILE = 'SELECT tags.name, tags.id FROM file_tag INNER JOIN tags ON file_tag.tag_id = tags.id WHERE file_tag.file_id=? ORDER BY tags.name'
     SQL_INSERT_TAG_TO_FILE = 'INSERT INTO file_tag (file_id, tag_id) VALUES (?, ?)'
+    SQL_IMPORT_TAG_TO_FILE = 'INSERT INTO file_tag (file_id, tag_id) VALUES (?, ?)'
     SQL_CHECK_TAG_FILE = 'SELECT 1 FROM file_tag WHERE file_id=? AND tag_id=? LIMIT 1'
     SQL_DELETE_TAG_FROM_FILE = 'DELETE FROM file_tag WHERE file_id=? AND tag_id=?'
 
@@ -74,6 +78,10 @@ class DBStorage:
         tag_id = self.cu.lastrowid
         self.c.commit()
         return tag_id
+
+    def import_tag(self, tag_id, name, parent):
+        self.cu.execute(self.SQL_IMPORT_TAG, (tag_id, name, parent))
+        self.c.commit()
 
     def select_tags(self, parent=None):
         sql = self.SQL_SELECT_TAGS if parent else self.SQL_SELECT_TAGS_NULL
@@ -101,10 +109,18 @@ class DBStorage:
         self.c.commit()
         return True
 
+    def import_tag_file(self, tag_id, file_id):
+        self.cu.execute(self.SQL_IMPORT_TAG_TO_FILE, (tag_id, file_id))
+        self.c.commit()
+
     def unassign_tag(self, tag_id, file_id):
         sql_params = (file_id, tag_id)
         self.cu.execute(self.SQL_DELETE_TAG_FROM_FILE, sql_params)
         self.c.commit()
+
+    def select_all_tag_files(self):
+        for row in self.cu.execute(self.SQL_SELECT_ALL_TAG_FILE).fetchall():
+            yield row
 
     def __init__(self, db_path: Path) -> None:
         self.db_path = db_path
@@ -325,11 +341,17 @@ class LibraryStorage:
             progress_count_exported_files(index_of_current_row + 1, count_rows, csv_current_page)
 
         exporter.close(is_last_page=index_of_current_row is None or index_of_current_row == count_rows - 1)
+        
+        import csv
+        with open(os.path.join(exporter.storage_structure, 'tags.csv'), 'w', encoding='utf-8', newline='\n') as csv_file:
+            csv_writer = csv.writer(csv_file)
+            for row in self.db.select_all_tags():
+                csv_writer.writerow(row)
 
-        #for row in self.db.select_all_tags():
-        #    exporter.write_tag_row(*row)
-
-        #exporter.close_tags()
+        with open(os.path.join(exporter.storage_structure, 'tags-files.csv'), 'w', encoding='utf-8', newline='\n') as csv_file:
+            csv_writer = csv.writer(csv_file)
+            for row in self.db.select_all_tag_files():
+                csv_writer.writerow(row)
 
     def import_csv_to_db(self, csv_path):
         def process_file_status(*args):
@@ -345,6 +367,14 @@ class LibraryStorage:
                         self.db.insert_rows(func=process_file_status)
 
         self.db.insert_rows(func=process_file_status)
+
+        with open(os.path.join(exporter.storage_structure, 'tags.csv'), 'r', encoding='utf-8', newline='\n') as csv_file:
+            for csv_row in csv.reader(csv_file):
+                self.db.import_tag(*csv_row)
+
+        with open(os.path.join(exporter.storage_structure, 'tags-files.csv'), 'r', encoding='utf-8', newline='\n') as csv_file:
+            for csv_row in csv.reader(csv_file):
+                self.db.import_tag_file(*csv_row)
 
     def get_file_status(self, inserted_directory, inserted_filename, existed_directory, existed_filename):
         inserted_path = '{}/{}'.format(inserted_directory, inserted_filename)  # .removeprefix('/')

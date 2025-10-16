@@ -522,10 +522,10 @@ class MyApplication(Gtk.Application):
     def do_startup(self):
         Gtk.Application.do_startup(self)
         
-        with open(MENU_MAIN_PATH, encoding='utf-8') as menu_main_file:
-            builder = Gtk.Builder.new_from_string(menu_main_file.read(), -1)
+        #with open(MENU_MAIN_PATH, encoding='utf-8') as menu_main_file:
+        #    builder = Gtk.Builder.new_from_string(menu_main_file.read(), -1)
 
-        self.set_menubar(builder.get_object('menubar'))
+        #self.set_menubar(builder.get_object('menubar'))
 
     def do_activate(self):
         window = AppWindow(self.lib_storage, application=self, title='Library storage scanner')
