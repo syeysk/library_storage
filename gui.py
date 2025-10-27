@@ -201,6 +201,24 @@ class BookListView:
 
 
 class TagTreeView:
+    def action_toggle_mode(self, _):
+        item = self.selection.get_selected_item()
+        if item is None:
+            return
+
+        label = item.cell.custom_label
+        entry = item.cell.custom_entry
+        if label.props.visible:
+            label.props.visible = False
+            entry.props.visible = True
+        else:
+            new_name = entry.props.text
+            label.props.label = new_name
+            self.lib_storage.db.update_tag(item.tag_id, new_name)
+
+            label.props.visible = True
+            entry.props.visible = False
+
     def _on_factory_setup_name(self, factory, list_item):
         label = Gtk.Label()
         label.props.xalign = 0
@@ -213,10 +231,6 @@ class TagTreeView:
         cell = Gtk.Box()
         cell.append(label)
         cell.append(entry)
- 
-        gesture = Gtk.GestureClick.new()
-        gesture.connect("released", lambda gesture, n_press, x, y: print(gesture, n_press, x, y))
-        label.add_controller(gesture)
  
         # https://api.pygobject.gnome.org/Gtk-4.0/class-TreeExpander.html
         tree_expander = Gtk.TreeExpander()
@@ -235,23 +249,8 @@ class TagTreeView:
         tag = list_item.props.item
         cell.custom_label.props.margin_start = 15 * tag.level
         cell.custom_entry.props.margin_start = 15 * tag.level
-
-        if item:
-            #text_variant = item.get_child_value(0)  # Get the first element of the tuple
-            #is_expandable_variant = item.get_child_value(1) # Get the second element
-
-            #label = list_item.get_child().get_child()  # Get the label inside TreeExpander
-            #label.set_text(text_variant.get_string())
-
-            tree_expander = list_item.get_child()
-            # Set the list_row property to associate with the current GtkTreeListRow
-            #tree_expander.set_list_row(list_item.get_list_row())
-
-            # Control expandability based on the data
-            #if is_expandable_variant.get_string() == "True":
-            tree_expander.set_indent_for_icon(True) # Add indentation
-            #else:
-            #    tree_expander.set_indent_for_row(False)
+        
+        tag.cell = cell
 
         drag_controller = Gtk.DragSource()
         drag_controller.connect("prepare", self.on_drag_prepare, item)
@@ -278,7 +277,6 @@ class TagTreeView:
 
     def _on_factory_setup_checked(self, factory, list_item):
         cell = Gtk.CheckButton(label='')
-        #cell.connect('toggled', self.on_radio_toggled, '1')
         cell._binding = None
         list_item.set_child(cell)
 
@@ -308,7 +306,8 @@ class TagTreeView:
 
         return None
 
-    def __init__(self, func_toggled_tag):
+    def __init__(self, lib_storage, func_toggled_tag):
+        self.lib_storage = lib_storage
         self.func_toggled_tag = func_toggled_tag
         self.list_store = Gio.ListStore(item_type=Tag)
         # https://api.pygobject.gnome.org/Gtk-4.0/class-TreeListModel.html
@@ -357,9 +356,9 @@ class TagTreeView:
         if current_item and current_item.parent_id:
             parent_id = current_item.parent_id
 
-        tag_id = self.last
-        self.append(tag_id, 'новый тег', False, parent_id)
-        self.last += 1
+        tag_name = 'новый тег'
+        tag_id = self.lib_storage.db.insert_tag(tag_name, parent_id)
+        self.append(tag_id, tag_name, False, parent_id)
 
     def action_new_child_tag(self, _):
         parent_id = None
@@ -367,9 +366,9 @@ class TagTreeView:
         if current_item:
             parent_id = current_item.tag_id
 
-        tag_id = self.last
-        self.append(tag_id, 'новый тег', False, parent_id)
-        self.last += 1
+        tag_name = 'новый тег'
+        tag_id = self.lib_storage.db.insert_tag(tag_name, parent_id)
+        self.append(tag_id, tag_name, False, parent_id)
 
 
 class ScanWindow(Gtk.ApplicationWindow):
@@ -512,8 +511,9 @@ class AppWindow(Gtk.ApplicationWindow):
         self.builder.scrolled_tags.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         self.builder.scrolled_tags.set_propagate_natural_height(True)
         
-        self.tag_tree = TagTreeView(self.toggled_tag)
+        self.tag_tree = TagTreeView(self.lib_storage, self.toggled_tag)
         self.builder.tags.append(self.tag_tree.view)
+        self.builder.button_edit_tag.connect('clicked', self.tag_tree.action_toggle_mode)
         self.builder.button_add_tag.connect('clicked', self.tag_tree.action_new_tag)
         self.builder.button_add_child_tag.connect('clicked', self.tag_tree.action_new_child_tag)
 

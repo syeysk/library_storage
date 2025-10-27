@@ -47,7 +47,7 @@ class DBStorage:
         CREATE TABLE IF NOT EXISTS tags (
             id INTEGER PRIMARY KEY,
             name VARCHAR(255),
-            parent INTEGER DEFAULT NULL
+            parent_id INTEGER DEFAULT NULL
         );
         CREATE TABLE IF NOT EXISTS file_tag (
             file_id INTEGER NOT NULL,
@@ -59,12 +59,13 @@ class DBStorage:
     SQL_UPDATE_SET_IS_DELETED = 'UPDATE files SET is_deleted=0 WHERE hash=?'
     SQL_UPDATE_FILE = 'UPDATE files SET directory=?, filename=? WHERE hash=?'
 
-    SQL_INSERT_TAG = 'INSERT INTO tags (name, parent) VALUES (?, ?)'
-    SQL_IMPORT_TAG = 'INSERT INTO tags (id, name, parent) VALUES (?, ?, ?)'
-    SQL_SELECT_TAGS = 'SELECT id, name FROM tags WHERE parent=?'
-    SQL_SELECT_TAGS_NULL = 'SELECT id, name FROM tags WHERE parent IS NULL'
-    SQL_SELECT_ALL_TAGS = 'SELECT id, name, parent FROM tags'
-    SQL_SELECT_TAG = 'SELECT name, parent FROM tags WHERE id=?'
+    SQL_INSERT_TAG = 'INSERT INTO tags (name, parent_id) VALUES (?, ?)'
+    SQL_IMPORT_TAG = 'INSERT INTO tags (id, name, parent_id) VALUES (?, ?, ?)'
+    SQL_SELECT_TAGS = 'SELECT id, name FROM tags WHERE parent_id=?'
+    SQL_SELECT_TAGS_NULL = 'SELECT id, name FROM tags WHERE parent_id IS NULL'
+    SQL_SELECT_ALL_TAGS = 'SELECT id, name, parent_id FROM tags'
+    SQL_SELECT_TAG = 'SELECT name, parent_id FROM tags WHERE id=?'
+    SQL_UPDATE_TAG = 'UPDATE tags SET name=? WHERE id=?'
 
     SQL_SELECT_ALL_TAG_FILE = 'SELECT file_id, tag_id FROM file_tag'
     
@@ -74,24 +75,29 @@ class DBStorage:
     SQL_CHECK_TAG_FILE = 'SELECT 1 FROM file_tag WHERE file_id=? AND tag_id=? LIMIT 1'
     SQL_DELETE_TAG_FROM_FILE = 'DELETE FROM file_tag WHERE file_id=? AND tag_id=?'
 
-    def insert_tag(self, name, parent=None):
+    def insert_tag(self, name, parent_id=None):
         self.smart_reopen()
-        self.cu.execute(self.SQL_INSERT_TAG, (name, parent))
+        self.cu.execute(self.SQL_INSERT_TAG, (name, parent_id))
         tag_id = self.cu.lastrowid
         self.c.commit()
         return tag_id
 
-    def import_tag(self, tag_id, name, parent):
+    def import_tag(self, tag_id, name, parent_id):
         self.smart_reopen()
-        self.cu.execute(self.SQL_IMPORT_TAG, (tag_id, name, parent))
+        self.cu.execute(self.SQL_IMPORT_TAG, (tag_id, name, parent_id))
         self.c.commit()
 
-    def select_tags(self, parent=None):
+    def select_tags(self, parent_id=None):
         self.smart_reopen()
-        sql = self.SQL_SELECT_TAGS if parent else self.SQL_SELECT_TAGS_NULL
-        params = (parent,) if parent else ()
+        sql = self.SQL_SELECT_TAGS if parent_id else self.SQL_SELECT_TAGS_NULL
+        params = (parent_id,) if parent_id else ()
         for row in self.cu.execute(sql, params).fetchall():
             yield row
+
+    def update_tag(self, tag_id, new_name):
+        self.smart_reopen()
+        self.cu.execute(self.SQL_UPDATE_TAG, (new_name, tag_id))
+        self.c.commit()
 
     def select_all_tags(self):
         self.smart_reopen()

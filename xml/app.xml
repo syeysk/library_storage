@@ -26,14 +26,15 @@
 			</Box>
 		</ScrolledWindow>
 		<Box spacing="2" orientation="HORIZONTAL">
-    	    <Button id="button_move_tag_up" sensitive="False"><![CDATA[<]]></Button>
-    	    <Button id="button_move_tag_down" sensitive="False"><![CDATA[>]]></Button>
+    	    <!--<Button id="button_move_tag_up" sensitive="False"><![CDATA[<]]></Button>
+    	    <Button id="button_move_tag_down" sensitive="False"><![CDATA[>]]></Button>-->
 
     	    <Button id="button_add_parent_tag" sensitive="False"><![CDATA[<+]]></Button>
     	    <Button id="button_add_tag">+</Button>
     	    <Button id="button_add_child_tag">+></Button>
 
-    	    <Button id="button_delete_tag" sensitive="False">-</Button>
+    	    <!--<Button id="button_delete_tag" sensitive="False">-</Button>-->
+    	    <Button id="button_edit_tag">✏️</Button>
 		</Box>
     </Box>
     <Box>
