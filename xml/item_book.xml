@@ -1,7 +1,9 @@
 <?xml version="1.1" encoding="UTF-8" ?>
 <Grid margin_top="6" margin_start="6" margin_end="6" margin_bottom="6">
 	<Row>
+    	<ScrolledWindow hexpand="">
 	    <Label xalign="0" id="title"></Label>
+		</ScrolledWindow>
 	</Row>
 	<Row>
 	    <Label xalign="0" id="path"></Label>

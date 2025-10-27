@@ -7,4 +7,8 @@
 	<Row>
 	    <Label id="existed_path" xalign="0"></Label>
 	</Row>
+
+	<Row>
+	    <Button id="button_delete" colspan="1">Удалить из базы</Button>
+	</Row>
 </Grid>

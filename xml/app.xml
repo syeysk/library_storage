@@ -1,19 +1,17 @@
 <?xml version="1.1" encoding="UTF-8" ?>
 <Box spacing="6" margin_top="6" margin_start="6" margin_end="6" margin_bottom="6" orientation="HORIZONTAL">
-    <Box spacing="6" margin_top="6" margin_start="6" margin_end="6" margin_bottom="6">
-    	<Button id="button_scan">Сканировать</Button>
-    	<Button id="button_scan_extern" sensitive="False">Сканировать внешнее</Button>
-	    <!--<Grid>
-		    <Row>
-        	    <Button id="button_change_storage_books" colspan="1">✏️</Button>
-        	    <Label colspan="3">Хранилище:</Label>
-		    </Row>
-		</Grid>-->
-		<ScrolledWindow id="scrolled_tags">
-			<Box id="tags">
-			</Box>
-		</ScrolledWindow>
-		<Box>
+    <Box spacing="20" margin_top="6" margin_start="6" margin_end="6" margin_bottom="6">
+		<Box spacing="5">
+			<Button id="button_scan">Сканировать</Button>
+			<Button id="button_scan_extern" sensitive="False">Сканировать внешнее</Button>
+			<!--<Grid>
+				<Row>
+					<Button id="button_change_storage_books" colspan="1">✏️</Button>
+					<Label colspan="3">Хранилище:</Label>
+				</Row>
+			</Grid>-->
+		</Box>
+		<Box spacing="4">
     	    <Button id="button_export">Экспортировать в заметки</Button>
 	        <Button id="button_import" sensitive="False">Импортировать из заметок</Button>
 			<!--<Grid>
@@ -22,6 +20,20 @@
 					<Label colspan="3">Заметки:</Label>
 				</Row>
 			</Grid>-->
+		</Box>
+		<ScrolledWindow id="scrolled_tags" vexpand="">
+			<Box id="tags">
+			</Box>
+		</ScrolledWindow>
+		<Box spacing="2" orientation="HORIZONTAL">
+    	    <Button id="button_move_tag_up" sensitive="False"><![CDATA[<]]></Button>
+    	    <Button id="button_move_tag_down" sensitive="False"><![CDATA[>]]></Button>
+
+    	    <Button id="button_add_parent_tag" sensitive="False"><![CDATA[<+]]></Button>
+    	    <Button id="button_add_tag">+</Button>
+    	    <Button id="button_add_child_tag">+></Button>
+
+    	    <Button id="button_delete_tag" sensitive="False">-</Button>
 		</Box>
     </Box>
     <Box>

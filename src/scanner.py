@@ -5,6 +5,7 @@ import sqlite3
 import zipfile
 from io import TextIOWrapper, StringIO
 from pathlib import Path
+from threading import current_thread
 
 STATUS_NEW = 'Новый'
 STATUS_MOVED = 'Переместили'
@@ -74,33 +75,40 @@ class DBStorage:
     SQL_DELETE_TAG_FROM_FILE = 'DELETE FROM file_tag WHERE file_id=? AND tag_id=?'
 
     def insert_tag(self, name, parent=None):
+        self.smart_reopen()
         self.cu.execute(self.SQL_INSERT_TAG, (name, parent))
         tag_id = self.cu.lastrowid
         self.c.commit()
         return tag_id
 
     def import_tag(self, tag_id, name, parent):
+        self.smart_reopen()
         self.cu.execute(self.SQL_IMPORT_TAG, (tag_id, name, parent))
         self.c.commit()
 
     def select_tags(self, parent=None):
+        self.smart_reopen()
         sql = self.SQL_SELECT_TAGS if parent else self.SQL_SELECT_TAGS_NULL
         params = (parent,) if parent else ()
         for row in self.cu.execute(sql, params).fetchall():
             yield row
 
     def select_all_tags(self):
+        self.smart_reopen()
         for row in self.cu.execute(self.SQL_SELECT_ALL_TAGS).fetchall():
             yield row
 
     def select_tag(self, tag_id):
+        self.smart_reopen()
         return self.cu.execute(self.SQL_SELECT_TAG, (tag_id,)).fetchone()
 
     def select_tags_by_file(self, file_id):
+        self.smart_reopen()
         for row in self.cu.execute(self.SQL_SELECT_TAGS_BY_FILE, (file_id,)).fetchall():
             yield row
 
     def assign_tag(self, tag_id, file_id):
+        self.smart_reopen()
         sql_params = (file_id, tag_id)
         if self.cu.execute(self.SQL_CHECK_TAG_FILE, sql_params).fetchone():
             return False
@@ -110,15 +118,18 @@ class DBStorage:
         return True
 
     def import_tag_file(self, tag_id, file_id):
+        self.smart_reopen()
         self.cu.execute(self.SQL_IMPORT_TAG_TO_FILE, (tag_id, file_id))
         self.c.commit()
 
     def unassign_tag(self, tag_id, file_id):
+        self.smart_reopen()
         sql_params = (file_id, tag_id)
         self.cu.execute(self.SQL_DELETE_TAG_FROM_FILE, sql_params)
         self.c.commit()
 
     def select_all_tag_files(self):
+        self.smart_reopen()
         for row in self.cu.execute(self.SQL_SELECT_ALL_TAG_FILE).fetchall():
             yield row
 
@@ -129,6 +140,7 @@ class DBStorage:
         self.cu.executescript(self.SQL_CREATE_TABLE)
         self.seq_sql_params = []
         self.duplicates_by_hash = {}
+        self.ident = None
 
     def reopen(self):
         """
@@ -137,11 +149,23 @@ class DBStorage:
         self.c = sqlite3.connect(self.db_path)
         self.cu = self.c.cursor()
 
+    def smart_reopen(self):
+        ident = current_thread().ident
+        if self.ident != ident:
+            self.reopen()
+            self.ident = ident
+    
+    def close(self):
+        self.smart_reopen()
+        self.c.close()
+
     def clear(self) -> None:
+        self.smart_reopen()
         self.cu.execute('DELETE FROM files WHERE 1=1')
         self.c.commit()
 
     def get_count_rows(self) -> int:
+        self.smart_reopen()
         total_rows_count = self.cu.execute(self.SQL_SELECT_COUNT_ROWS).fetchone()
         return total_rows_count[0]
 
@@ -164,6 +188,7 @@ class DBStorage:
         иначе - возбуждать исключение
         :return:
         """
+        self.smart_reopen()
         sql_insert = self.SQL_INSERT_ROW_WITH_ID if with_id else self.SQL_INSERT_ROW
         for sql_params in self.seq_sql_params:
             file_hash = sql_params[0]
@@ -189,6 +214,7 @@ class DBStorage:
         self.seq_sql_params.clear()
 
     def select_rows(self, tags=None, only_deleted=False, order_by='files.filename'):
+        self.smart_reopen()
         sql_params = []
         sql = ['SELECT files.hash, files.id, files.directory, files.filename FROM files']
         sql_where = []
@@ -217,10 +243,12 @@ class DBStorage:
                 yield row
 
     def set_is_deleted_for_all(self):
+        self.smart_reopen()
         self.cu.execute(self.SQL_UPDATE_SET_IS_DELETED_FOR_ALL)
         self.c.commit()
 
     def set_is_not_deleted(self, file_hash):
+        self.smart_reopen()
         self.cu.execute(self.SQL_UPDATE_SET_IS_DELETED, (file_hash,))
 
     def process_deleted_files(self, func):
@@ -231,10 +259,12 @@ class DBStorage:
                 func(STATUS_DELETED, existed_path, None, file_hash)
 
     def delete_file(self, file_hash):
+        self.smart_reopen()
         self.cu.execute(self.SQL_DELETE_FILE, (file_hash, ))
         self.c.commit()
 
     def insert_file(self, file_hash, file_id, inserted_file):
+        self.smart_reopen()
         self.cu.execute(
             self.SQL_INSERT_ROW_WITH_ID,
             (file_hash, file_id, os.path.dirname(inserted_file), os.path.basename(inserted_file))
@@ -242,6 +272,7 @@ class DBStorage:
         self.c.commit()
 
     def update(self, file_hash, inserted_directory, inserted_filename):
+        self.smart_reopen()
         self.cu.execute(self.SQL_UPDATE_FILE, (inserted_directory, inserted_filename, file_hash))
 
 
@@ -263,7 +294,7 @@ class LibraryStorage:
 
     def __exit__(self, _1, _2, _3):
         if self.db:
-            self.db.c.close()
+            self.db.close()
 
     def set_db(self, db):
         self.db = db
@@ -273,6 +304,7 @@ class LibraryStorage:
             library_path: Path,
             process_dublicate,
             progress_count_scanned_files=None,
+            progress_current_file=None,
             func=None,
     ):
         """Сканирует информацию о файлах в директории и заносит её в базу"""
@@ -302,7 +334,11 @@ class LibraryStorage:
                 if filename.split('.')[-1] in LIBRARY_IGNORE_EXTENSIONS:
                     continue  # останется отмеченным как удалённый, а потому в структуру (экспорт) не попадёт
 
-                file_hash = get_file_hash(os.path.join(directory, filename))
+                full_path = os.path.join(directory, filename)
+                if progress_current_file:
+                    progress_current_file(full_path)
+
+                file_hash = get_file_hash(full_path)
                 self.db.append_row((file_hash, directory, filename))
                 total_count_files += 1
                 if progress_count_scanned_files:

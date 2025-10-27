@@ -1,7 +1,7 @@
 import json
 import sys
 from pathlib import Path
-from threading import Thread
+from threading import Thread, current_thread
 
 import gi
 gi.require_version("Gdk", "4.0")
@@ -62,12 +62,13 @@ class Book(GObject.Object):
 class Tag(GObject.Object):
     __gtype_name__ = 'Tag'
     
-    def __init__(self, tag_id, name, checked, level=0):
+    def __init__(self, tag_id, name, checked, parent_id=0, level=0):
         super().__init__()
         self._tag_id = tag_id
         self._name = name
         self._checked = checked
         self._level = level
+        self._parent_id = parent_id
 
         self._children = Gio.ListStore(item_type=Tag)
 
@@ -86,6 +87,10 @@ class Tag(GObject.Object):
     @GObject.Property(type=int)
     def level(self):
         return self._level
+
+    @GObject.Property(type=int)
+    def parent_id(self):
+        return self._parent_id
 
     def get_children(self):
         return self._children
@@ -197,22 +202,39 @@ class BookListView:
 
 class TagTreeView:
     def _on_factory_setup_name(self, factory, list_item):
-        cell = Gtk.Label()
-        cell.props.xalign = 0
-        cell._binding = None
+        label = Gtk.Label()
+        label.props.xalign = 0
+        label._binding = None
+        entry = Gtk.Entry()
+        entry.props.xalign = 0
+        entry._binding = None
+        entry.props.visible = False
 
+        cell = Gtk.Box()
+        cell.append(label)
+        cell.append(entry)
+ 
+        gesture = Gtk.GestureClick.new()
+        gesture.connect("released", lambda gesture, n_press, x, y: print(gesture, n_press, x, y))
+        label.add_controller(gesture)
+ 
         # https://api.pygobject.gnome.org/Gtk-4.0/class-TreeExpander.html
         tree_expander = Gtk.TreeExpander()
         tree_expander.set_child(cell)
         list_item.set_child(tree_expander)
+        
+        tree_expander.custom_label = label
+        tree_expander.custom_entry = entry
 
     def _on_factory_bind_name(self, factory, list_item):
-        cell = list_item.get_child().get_child()
+        cell = list_item.get_child()
         item = list_item.get_item()
-        cell._binding = item.bind_property('name', cell, 'label', GObject.BindingFlags.SYNC_CREATE)
+        cell.custom_label._binding = item.bind_property('name', cell.custom_label, 'label', GObject.BindingFlags.SYNC_CREATE)
+        cell.custom_entry._binding = item.bind_property('name', cell.custom_entry, 'text', GObject.BindingFlags.SYNC_CREATE)
 
         tag = list_item.props.item
-        cell.props.margin_start = 10 * tag.level
+        cell.custom_label.props.margin_start = 15 * tag.level
+        cell.custom_entry.props.margin_start = 15 * tag.level
 
         if item:
             #text_variant = item.get_child_value(0)  # Get the first element of the tuple
@@ -231,11 +253,20 @@ class TagTreeView:
             #else:
             #    tree_expander.set_indent_for_row(False)
 
-        full_cell = list_item.get_child()
         drag_controller = Gtk.DragSource()
         drag_controller.connect("prepare", self.on_drag_prepare, item)
-        drag_controller.connect("drag-begin", self.on_drag_begin, full_cell)
-        full_cell.add_controller(drag_controller)
+        drag_controller.connect("drag-begin", self.on_drag_begin, cell)
+        cell.add_controller(drag_controller)
+
+    def _on_factory_unbind_name(self, factory, list_item):
+        cell = list_item.get_child()
+        if cell.custom_label._binding:
+            cell.custom_label._binding.unbind()
+            cell.custom_label._binding = None
+
+        if cell.custom_entry._binding:
+            cell.custom_entry._binding.unbind()
+            cell.custom_entry._binding = None
 
     def on_drag_prepare(self, _ctrl, _x, _y, item):
         item_value = Gdk.ContentProvider.new_for_value(item)
@@ -261,7 +292,7 @@ class TagTreeView:
         self.tag_binded_values[tag_id] = widget.props.active
         self.func_toggled_tag(tag_id, self.tag_binded_values)
 
-    def _on_factory_unbind(self, factory, list_item):
+    def _on_factory_unbind_checked(self, factory, list_item):
         cell = list_item.get_child()
         if cell._binding:
             cell._binding.unbind()
@@ -282,13 +313,13 @@ class TagTreeView:
         self.list_store = Gio.ListStore(item_type=Tag)
         # https://api.pygobject.gnome.org/Gtk-4.0/class-TreeListModel.html
         self.tree_store = Gtk.TreeListModel.new(self.list_store, True, True, self.get_children)
-        selection = Gtk.SingleSelection(model=self.tree_store)
-        self.view = Gtk.ColumnView(model=selection)
+        self.selection = Gtk.SingleSelection(model=self.tree_store)
+        self.view = Gtk.ColumnView(model=self.selection)
 
         factory_name = Gtk.SignalListItemFactory()
         factory_name.connect('setup', self._on_factory_setup_name)
         factory_name.connect('bind', self._on_factory_bind_name)
-        factory_name.connect('unbind', self._on_factory_unbind)
+        factory_name.connect('unbind', self._on_factory_unbind_name)
         factory_name.connect("teardown", self._on_factory_teardown)        
         column_name = Gtk.ColumnViewColumn(title='Тег', factory=factory_name)
         column_name.props.expand = True
@@ -297,26 +328,48 @@ class TagTreeView:
         factory_checked = Gtk.SignalListItemFactory()
         factory_checked.connect('setup', self._on_factory_setup_checked)
         factory_checked.connect('bind', self._on_factory_bind_checked)
-        factory_checked.connect('unbind', self._on_factory_unbind)
+        factory_checked.connect('unbind', self._on_factory_unbind_checked)
         factory_checked.connect("teardown", self._on_factory_teardown)        
-        column_checked = Gtk.ColumnViewColumn(title='and', factory=factory_checked)
+        column_checked = Gtk.ColumnViewColumn(title='', factory=factory_checked)
         column_checked.props.fixed_width = 50
         self.view.append_column(column_checked)
         
         self.tags = {}
         self.tag_binded_values = {}
+        
+        self.last = 1
 
     def append(self, tag_id, name, checked, parent_id=None):
         if parent_id:
             parent_tag = self.tags[parent_id]
-            tag = Tag(tag_id, name, checked, parent_tag.level + 1)
+            tag = Tag(tag_id, name, checked, parent_id, parent_tag.level + 1)
             parent_tag._children.append(tag)
         else:
-            tag = Tag(tag_id, name, checked, 0)
+            tag = Tag(tag_id, name, checked, 0, 0)
             self.list_store.append(tag)
 
         self.tags[tag_id] = tag
         self.tag_binded_values[tag_id] = tag.checked
+
+    def action_new_tag(self, _):
+        parent_id = None
+        current_item = self.selection.get_selected_item()
+        if current_item and current_item.parent_id:
+            parent_id = current_item.parent_id
+
+        tag_id = self.last
+        self.append(tag_id, 'новый тег', False, parent_id)
+        self.last += 1
+
+    def action_new_child_tag(self, _):
+        parent_id = None
+        current_item = self.selection.get_selected_item()
+        if current_item:
+            parent_id = current_item.tag_id
+
+        tag_id = self.last
+        self.append(tag_id, 'новый тег', False, parent_id)
+        self.last += 1
 
 
 class ScanWindow(Gtk.ApplicationWindow):
@@ -349,13 +402,20 @@ class ScanWindow(Gtk.ApplicationWindow):
 
     def progress_count_scanned_files(self, count_scanned_files):
         self.builder.count_scanned_files.props.label = str(count_scanned_files)
+        
+    def progress_current_file(self, full_path):
+        self.builder.current_file.props.label = str(full_path)
 
-    def delete_duplicate(self, _, builder, inserted_filepath):
+    def action_delete_duplicate(self, _, builder, inserted_filepath):
         try:
             (config.storage_books / inserted_filepath).unlink()
             builder.button_inserted.props.sensitive = False
         except Exception as error:
             print(error)
+
+    def action_delete_from_database(self, _, builder, file_hash):
+        self.lib_storage.db.delete_file(file_hash)
+        builder.button_delete.props.sensitive = False
 
     def add_file_item(self, status, existed_filepath, inserted_filepath, file_hash):
         if status == STATUS_UNTOUCHED:
@@ -369,25 +429,24 @@ class ScanWindow(Gtk.ApplicationWindow):
             builder.existed_path.props.label = existed_filepath
 
         if status == STATUS_DUPLICATE:
-            builder.button_inserted.connect('clicked', self.delete_duplicate, builder, inserted_filepath)
+            builder.button_inserted.connect('clicked', self.action_delete_duplicate, builder, inserted_filepath)
+
+        if status == STATUS_DELETED:
+            builder.button_delete.connect('clicked', self.action_delete_from_database, builder, file_hash)
 
         builder.root_widget.set_name('item-task')
         self.builder.books.append(builder.root_widget)
         #self.task_list.append(status, existed_filepath, inserted_filepath)
-    
-    #def fg_finish(self):
-    #    self.lib_storage.db.reopen()
 
     def fg_scan(self):
-        self.lib_storage.db.reopen()
         self.lib_storage.scan_to_db(
             config.storage_books,
             'original',
             progress_count_scanned_files=self.progress_count_scanned_files,
+            progress_current_file=self.progress_current_file,
             func=self.add_file_item,
         )
         self.emit('scan_end')
-        #GLib.idle_add(self.fg_finish)
 
 
 class ExportWindow(Gtk.ApplicationWindow):
@@ -407,13 +466,11 @@ class ExportWindow(Gtk.ApplicationWindow):
 
     def fg_export(self):
         exporter = MarkdownExporter(config.storage_notes, config.storage_books)
-    
-        self.lib_storage.db.reopen()
+
         self.lib_storage.export_db(
             exporter,
             self.progress_count_exported_files,
         )
-        #GLib.idle_add(self.fg_finish)
 
 
 # Source: https://stackoverflow.com/questions/65807310/how-to-get-total-screen-size-in-python-gtk-without-using-deprecated-gdk-screen
@@ -432,7 +489,7 @@ class AppWindow(Gtk.ApplicationWindow):
         self.lib_storage = lib_storage
 
         x, y = get_screen_size(Gdk.Display.get_default())
-        self.set_default_size(min(x, 600), y)
+        self.set_default_size(min(x, 1000), y)
         self.props.show_menubar = True
         
         self.builder = WindowBuilder(XML_DIR / 'app.xml', {})
@@ -445,7 +502,6 @@ class AppWindow(Gtk.ApplicationWindow):
         #self.add_action(action_show_map)
 
         self.builder.button_scan.connect('clicked', self.on_scan)
-        self.builder.button_scan_extern.connect('clicked', self.on_scan_extern)
         self.builder.button_export.connect('clicked', self.on_export)
         self.lib_storage.set_db(DBStorage(config.db_path))
 
@@ -458,6 +514,8 @@ class AppWindow(Gtk.ApplicationWindow):
         
         self.tag_tree = TagTreeView(self.toggled_tag)
         self.builder.tags.append(self.tag_tree.view)
+        self.builder.button_add_tag.connect('clicked', self.tag_tree.action_new_tag)
+        self.builder.button_add_child_tag.connect('clicked', self.tag_tree.action_new_child_tag)
 
         self.build_tags()
         
@@ -491,11 +549,6 @@ class AppWindow(Gtk.ApplicationWindow):
     def on_scan(self, action):
         window = ScanWindow(self.lib_storage, transient_for=self, title='Сканирование', modal=True)
         window.connect('scan_end', self.update_book_list)
-        window.present()
-
-    def on_scan_extern(self, action):
-        # TODO: открываем окно для выбора внешнего хранилища и только потом открываем окно
-        window = ScanWindow(self.lib_storage, transient_for=self, title='Сканирование', modal=True)
         window.present()
 
     def on_export(self, action):
