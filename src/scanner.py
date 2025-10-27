@@ -66,8 +66,11 @@ class DBStorage:
     SQL_SELECT_ALL_TAGS = 'SELECT id, name, parent_id FROM tags'
     SQL_SELECT_TAG = 'SELECT name, parent_id FROM tags WHERE id=?'
     SQL_UPDATE_TAG = 'UPDATE tags SET name=? WHERE id=?'
+    SQL_DELETE_TAG = 'DELETE FROM tags WHERE id=?'
 
     SQL_SELECT_ALL_TAG_FILE = 'SELECT file_id, tag_id FROM file_tag'
+    SQL_SELECT_COUNT_FILES_FOR_TAG = 'SELECT COUNT(file_id) FROM file_tag WHERE tag_id=?'
+    SQL_SELECT_COUNT_CHILD_TAGS = 'SELECT COUNT(id) FROM tags WHERE parent_id=?'
     
     SQL_SELECT_TAGS_BY_FILE = 'SELECT tags.name, tags.id FROM file_tag INNER JOIN tags ON file_tag.tag_id = tags.id WHERE file_tag.file_id=? ORDER BY tags.name'
     SQL_INSERT_TAG_TO_FILE = 'INSERT INTO file_tag (file_id, tag_id) VALUES (?, ?)'
@@ -112,6 +115,21 @@ class DBStorage:
         self.smart_reopen()
         for row in self.cu.execute(self.SQL_SELECT_TAGS_BY_FILE, (file_id,)).fetchall():
             yield row
+
+    def delete_tag(self, tag_id):
+        self.smart_reopen()
+        self.cu.execute(self.SQL_DELETE_TAG, (tag_id,))
+        self.c.commit()
+
+    def select_count_files_by_tag(self, tag_id):
+        self.smart_reopen()
+        for row in self.cu.execute(self.SQL_SELECT_COUNT_FILES_FOR_TAG, (tag_id,)).fetchall():
+            return row[0]
+
+    def select_count_child_tags(self, tag_id):
+        self.smart_reopen()
+        for row in self.cu.execute(self.SQL_SELECT_COUNT_CHILD_TAGS, (tag_id,)).fetchall():
+            return row[0]
 
     def assign_tag(self, tag_id, file_id):
         self.smart_reopen()

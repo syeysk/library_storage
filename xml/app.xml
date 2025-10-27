@@ -29,12 +29,12 @@
     	    <!--<Button id="button_move_tag_up" sensitive="False"><![CDATA[<]]></Button>
     	    <Button id="button_move_tag_down" sensitive="False"><![CDATA[>]]></Button>-->
 
-    	    <Button id="button_add_parent_tag" sensitive="False"><![CDATA[<+]]></Button>
-    	    <Button id="button_add_tag">+</Button>
-    	    <Button id="button_add_child_tag">+></Button>
+    	    <Button id="button_delete_tag" tooltip="Удалить тег (если не содержит дочерних или кгиг)">-</Button>
+    	    <!--<Button id="button_add_parent_tag" sensitive="False"><![CDATA[<+]]></Button>-->
+    	    <Button id="button_add_tag" tooltip="Добавить тег">+</Button>
+    	    <Button id="button_add_child_tag" tooltip="Добавить дочерний тег">+></Button>
 
-    	    <!--<Button id="button_delete_tag" sensitive="False">-</Button>-->
-    	    <Button id="button_edit_tag">✏️</Button>
+    	    <Button id="button_edit_tag" tooltip="Переименовать тег/сохранить">✏️</Button>
 		</Box>
     </Box>
     <Box>

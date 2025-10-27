@@ -311,8 +311,8 @@ class TagTreeView:
         self.func_toggled_tag = func_toggled_tag
         self.list_store = Gio.ListStore(item_type=Tag)
         # https://api.pygobject.gnome.org/Gtk-4.0/class-TreeListModel.html
-        self.tree_store = Gtk.TreeListModel.new(self.list_store, True, True, self.get_children)
-        self.selection = Gtk.SingleSelection(model=self.tree_store)
+        tree_store = Gtk.TreeListModel.new(self.list_store, True, True, self.get_children)
+        self.selection = Gtk.SingleSelection(model=tree_store)
         self.view = Gtk.ColumnView(model=self.selection)
 
         factory_name = Gtk.SignalListItemFactory()
@@ -335,26 +335,27 @@ class TagTreeView:
         
         self.tags = {}
         self.tag_binded_values = {}
-        
-        self.last = 1
 
     def append(self, tag_id, name, checked, parent_id=None):
         if parent_id:
             parent_tag = self.tags[parent_id]
-            tag = Tag(tag_id, name, checked, parent_id, parent_tag.level + 1)
-            parent_tag._children.append(tag)
+            level = parent_tag.level + 1
+            list_store = parent_tag._children
         else:
-            tag = Tag(tag_id, name, checked, 0, 0)
-            self.list_store.append(tag)
+            parent_id = 0
+            level = 0
+            list_store = self.list_store
 
+        tag = Tag(tag_id, name, checked, parent_id, level)
+        list_store.append(tag)
         self.tags[tag_id] = tag
         self.tag_binded_values[tag_id] = tag.checked
 
     def action_new_tag(self, _):
         parent_id = None
-        current_item = self.selection.get_selected_item()
-        if current_item and current_item.parent_id:
-            parent_id = current_item.parent_id
+        current_tag = self.selection.get_selected_item()
+        if current_tag and current_tag.parent_id:
+            parent_id = current_tag.parent_id
 
         tag_name = 'новый тег'
         tag_id = self.lib_storage.db.insert_tag(tag_name, parent_id)
@@ -362,14 +363,30 @@ class TagTreeView:
 
     def action_new_child_tag(self, _):
         parent_id = None
-        current_item = self.selection.get_selected_item()
-        if current_item:
-            parent_id = current_item.tag_id
+        current_tag = self.selection.get_selected_item()
+        if current_tag:
+            parent_id = current_tag.tag_id
 
         tag_name = 'новый тег'
         tag_id = self.lib_storage.db.insert_tag(tag_name, parent_id)
         self.append(tag_id, tag_name, False, parent_id)
 
+    def action_delete_tag(self, _):
+        current_tag = self.selection.get_selected_item()
+        tag_id = current_tag.tag_id
+        parent_id = current_tag.parent_id
+        if current_tag:
+            count_files = self.lib_storage.db.select_count_files_by_tag(tag_id)
+            count_child_tags = self.lib_storage.db.select_count_child_tags(tag_id)
+            if not (count_files or count_child_tags):
+                del self.tags[tag_id]
+                del self.tag_binded_values[tag_id]
+                
+                list_store = self.tags[parent_id].get_children() if parent_id else self.list_store
+                is_found, position = list_store.find(current_tag) # TODO: если ищет методом перебора, то найти решение без перебора
+                list_store.remove(position)
+                self.lib_storage.db.delete_tag(tag_id)
+                
 
 class ScanWindow(Gtk.ApplicationWindow):
     task_item_widgets = {
@@ -516,6 +533,7 @@ class AppWindow(Gtk.ApplicationWindow):
         self.builder.button_edit_tag.connect('clicked', self.tag_tree.action_toggle_mode)
         self.builder.button_add_tag.connect('clicked', self.tag_tree.action_new_tag)
         self.builder.button_add_child_tag.connect('clicked', self.tag_tree.action_new_child_tag)
+        self.builder.button_delete_tag.connect('clicked', self.tag_tree.action_delete_tag)
 
         self.build_tags()
         
@@ -570,7 +588,6 @@ class MyApplication(Gtk.Application):
             css_provider,
             Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
         )
-
 
     def do_startup(self):
         Gtk.Application.do_startup(self)

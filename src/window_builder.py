@@ -66,6 +66,8 @@ class WindowBuilder:
                     gtkelem.set_vexpand(True)
                 elif attr_name == 'hexpand':
                     gtkelem.set_hexpand(True)
+                elif attr_name == 'tooltip':
+                    gtkelem.set_tooltip_text(attr_value)
                 else:
                     if attr_name in {'selected', 'xalign', 'spacing', 'margin_top', 'margin_start', 'margin_bottom', 'margin_end', 'column_spacing', 'row_spacing', 'max_content_height'}:
                         attr_value = int(attr_value) if attr_value else 0
