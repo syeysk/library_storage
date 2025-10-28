@@ -134,6 +134,7 @@ class BookListView:
         if isinstance(value, Tag):
             self.lib_storage.db.assign_tag(value.tag_id, file_item.book_id)
             self.populate_tags(file_item)
+            self.update_tag_count(value.tag_id)
 
     def _on_factory_unbind(self, factory, list_item):
         cell = list_item.get_child()
@@ -149,8 +150,9 @@ class BookListView:
         cell = list_item.get_child()
         #cell._binding = None
 
-    def __init__(self, parent, lib_storage):
+    def __init__(self, parent, lib_storage, update_tag_count):
         self.lib_storage = lib_storage
+        self.update_tag_count = update_tag_count
         self.parent = parent
         factory = Gtk.SignalListItemFactory()
         factory.connect('setup', self._on_factory_setup)
@@ -174,6 +176,7 @@ class BookListView:
     def delete_tag(self, _, book, tag_id):
         self.lib_storage.db.unassign_tag(tag_id, book.book_id)
         self.populate_tags(book)
+        self.update_tag_count(tag_id)
 
     def populate_tags(self, book):
         tags = self.book_widgets[book.book_id].builder.tags
@@ -292,6 +295,7 @@ class TagCheckColumnBuilder:
 
     def _on_factory_unbind(self, factory, list_item):
         cell = list_item.get_child()
+        item = list_item.get_item()
         if cell._binding:
             cell._binding.unbind()
             cell._binding = None
@@ -310,6 +314,39 @@ class TagCheckColumnBuilder:
         self.tag_binded_values[tag_id] = widget.props.active
         self.func_toggled_tag(tag_id, self.tag_binded_values)
 
+
+class TagCountColumnBuilder:
+    def __init__(self, lib_storage, update_count_funces):
+        factory = Gtk.SignalListItemFactory()
+        factory.connect('setup', self._on_factory_setup)
+        factory.connect('bind', self._on_factory_bind)
+        factory.connect('unbind', self._on_factory_unbind)
+        factory.connect("teardown", self._on_factory_teardown)        
+        self.column = Gtk.ColumnViewColumn(title='Файлов', factory=factory)
+        self.column.props.expand = True
+        
+        self.lib_storage = lib_storage
+        self.update_count_funces = update_count_funces
+
+    def _on_factory_setup(self, factory, list_item):
+        cell = Gtk.Label(label='')
+        list_item.set_child(cell)
+
+    def _on_factory_bind(self, factory, list_item):
+        cell = list_item.get_child()
+        item = list_item.get_item()
+        self.update_count(cell, item.tag_id)
+        self.update_count_funces[item.tag_id] = lambda: self.update_count(cell, item.tag_id)
+
+    def _on_factory_unbind(self, factory, list_item):
+        cell = list_item.get_child()
+
+    def _on_factory_teardown(self, factory, list_item):
+        cell = list_item.get_child()
+
+    def update_count(self, label, tag_id):
+        count_files = self.lib_storage.db.select_count_files_by_tag(tag_id)
+        label.props.label = str(count_files)
 
 class TagTreeView:
     def action_toggle_mode(self, _):
@@ -346,12 +383,19 @@ class TagTreeView:
 
         self.tags = {}
         self.tag_binded_values = {}
+        self.update_count_funces = {}
 
         column_name_builder = TagNameColumnBuilder()
         self.view.append_column(column_name_builder.column)
 
         column_check_builder = TagCheckColumnBuilder(self.tag_binded_values, func_toggled_tag)
-        self.view.append_column(column_check_builder.column)        
+        self.view.append_column(column_check_builder.column)
+
+        column_count_builder = TagCountColumnBuilder(self.lib_storage, self.update_count_funces)
+        self.view.append_column(column_count_builder.column)
+
+    def update_tag_count(self, tag_id):
+        self.update_count_funces[tag_id]()
 
     def append(self, tag_id, name, checked, parent_id=None):
         if parent_id:
@@ -398,6 +442,7 @@ class TagTreeView:
             if not (count_files or count_child_tags):
                 del self.tags[tag_id]
                 del self.tag_binded_values[tag_id]
+                del self.update_count_funces[tag_id]
                 
                 list_store = self.tags[parent_id].get_children() if parent_id else self.list_store
                 is_found, position = list_store.find(current_tag) # TODO: если ищет методом перебора, то найти решение без перебора
@@ -559,7 +604,7 @@ class AppWindow(Gtk.ApplicationWindow):
         self.builder.scrolled_books.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         self.builder.scrolled_books.set_propagate_natural_height(True)
 
-        self.book_list = BookListView(self, self.lib_storage)
+        self.book_list = BookListView(self, self.lib_storage, self.tag_tree.update_tag_count)
         self.builder.books.append(self.book_list.view)
         
         self.update_book_list()
