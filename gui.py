@@ -200,26 +200,17 @@ class BookListView:
         item = self.list_store.get_item(position)
 
 
-class TagTreeView:
-    def action_toggle_mode(self, _):
-        item = self.selection.get_selected_item()
-        if item is None:
-            return
+class TagNameColumnBuilder:
+    def __init__(self):
+        factory = Gtk.SignalListItemFactory()
+        factory.connect('setup', self._on_factory_setup)
+        factory.connect('bind', self._on_factory_bind)
+        factory.connect('unbind', self._on_factory_unbind)
+        factory.connect("teardown", self._on_factory_teardown)        
+        self.column = Gtk.ColumnViewColumn(title='Тег', factory=factory)
+        self.column.props.expand = True
 
-        label = item.cell.custom_label
-        entry = item.cell.custom_entry
-        if label.props.visible:
-            label.props.visible = False
-            entry.props.visible = True
-        else:
-            new_name = entry.props.text
-            label.props.label = new_name
-            self.lib_storage.db.update_tag(item.tag_id, new_name)
-
-            label.props.visible = True
-            entry.props.visible = False
-
-    def _on_factory_setup_name(self, factory, list_item):
+    def _on_factory_setup(self, factory, list_item):
         label = Gtk.Label()
         label.props.xalign = 0
         label._binding = None
@@ -240,7 +231,7 @@ class TagTreeView:
         tree_expander.custom_label = label
         tree_expander.custom_entry = entry
 
-    def _on_factory_bind_name(self, factory, list_item):
+    def _on_factory_bind(self, factory, list_item):
         cell = list_item.get_child()
         item = list_item.get_item()
         cell.custom_label._binding = item.bind_property('name', cell.custom_label, 'label', GObject.BindingFlags.SYNC_CREATE)
@@ -257,7 +248,7 @@ class TagTreeView:
         drag_controller.connect("drag-begin", self.on_drag_begin, cell)
         cell.add_controller(drag_controller)
 
-    def _on_factory_unbind_name(self, factory, list_item):
+    def _on_factory_unbind(self, factory, list_item):
         cell = list_item.get_child()
         if cell.custom_label._binding:
             cell.custom_label._binding.unbind()
@@ -267,6 +258,11 @@ class TagTreeView:
             cell.custom_entry._binding.unbind()
             cell.custom_entry._binding = None
 
+    def _on_factory_teardown(self, factory, list_item):
+        cell = list_item.get_child()
+        cell.custom_label._binding = None
+        cell.custom_entry._binding = None
+
     def on_drag_prepare(self, _ctrl, _x, _y, item):
         item_value = Gdk.ContentProvider.new_for_value(item)
         return Gdk.ContentProvider.new_union([item_value])
@@ -275,30 +271,64 @@ class TagTreeView:
         icon = Gtk.WidgetPaintable.new(full_cell)
         ctrl.set_icon(icon, 0, 0)
 
-    def _on_factory_setup_checked(self, factory, list_item):
+
+class TagCheckColumnBuilder:
+    def __init__(self, tag_binded_values, func_toggled_tag):
+        factory = Gtk.SignalListItemFactory()
+        factory.connect('setup', self._on_factory_setup)
+        factory.connect('bind', self._on_factory_bind)
+        factory.connect('unbind', self._on_factory_unbind)
+        factory.connect("teardown", self._on_factory_teardown)        
+        self.column = Gtk.ColumnViewColumn(title='', factory=factory)
+        self.column.props.fixed_width = 50
+        
+        self.tag_binded_values = tag_binded_values
+        self.func_toggled_tag = func_toggled_tag
+
+    def _on_factory_setup(self, factory, list_item):
         cell = Gtk.CheckButton(label='')
         cell._binding = None
         list_item.set_child(cell)
 
-    def _on_factory_bind_checked(self, factory, list_item):
-        cell = list_item.get_child()
-        item = list_item.get_item()
-        cell._binding = item.bind_property('checked', cell, 'active', GObject.BindingFlags.SYNC_CREATE)
-        cell.connect('toggled', self.click_tag, item.tag_id, cell)
-
-    def click_tag(self, _, tag_id, widget):
-        self.tag_binded_values[tag_id] = widget.props.active
-        self.func_toggled_tag(tag_id, self.tag_binded_values)
-
-    def _on_factory_unbind_checked(self, factory, list_item):
+    def _on_factory_unbind(self, factory, list_item):
         cell = list_item.get_child()
         if cell._binding:
             cell._binding.unbind()
             cell._binding = None
 
+    def _on_factory_bind(self, factory, list_item):
+        cell = list_item.get_child()
+        item = list_item.get_item()
+        cell._binding = item.bind_property('checked', cell, 'active', GObject.BindingFlags.SYNC_CREATE)
+        cell.connect('toggled', self.click_tag, item.tag_id, cell)
+
     def _on_factory_teardown(self, factory, list_item):
         cell = list_item.get_child()
         cell._binding = None
+
+    def click_tag(self, _, tag_id, widget):
+        self.tag_binded_values[tag_id] = widget.props.active
+        self.func_toggled_tag(tag_id, self.tag_binded_values)
+
+
+class TagTreeView:
+    def action_toggle_mode(self, _):
+        item = self.selection.get_selected_item()
+        if item is None:
+            return
+
+        label = item.cell.custom_label
+        entry = item.cell.custom_entry
+        if label.props.visible:
+            label.props.visible = False
+            entry.props.visible = True
+        else:
+            new_name = entry.props.text
+            label.props.label = new_name
+            self.lib_storage.db.update_tag(item.tag_id, new_name)
+
+            label.props.visible = True
+            entry.props.visible = False
     
     def get_children(self, item):
         if isinstance(item, Tag):
@@ -308,33 +338,20 @@ class TagTreeView:
 
     def __init__(self, lib_storage, func_toggled_tag):
         self.lib_storage = lib_storage
-        self.func_toggled_tag = func_toggled_tag
         self.list_store = Gio.ListStore(item_type=Tag)
         # https://api.pygobject.gnome.org/Gtk-4.0/class-TreeListModel.html
         tree_store = Gtk.TreeListModel.new(self.list_store, True, True, self.get_children)
         self.selection = Gtk.SingleSelection(model=tree_store)
         self.view = Gtk.ColumnView(model=self.selection)
 
-        factory_name = Gtk.SignalListItemFactory()
-        factory_name.connect('setup', self._on_factory_setup_name)
-        factory_name.connect('bind', self._on_factory_bind_name)
-        factory_name.connect('unbind', self._on_factory_unbind_name)
-        factory_name.connect("teardown", self._on_factory_teardown)        
-        column_name = Gtk.ColumnViewColumn(title='Тег', factory=factory_name)
-        column_name.props.expand = True
-        self.view.append_column(column_name)
-
-        factory_checked = Gtk.SignalListItemFactory()
-        factory_checked.connect('setup', self._on_factory_setup_checked)
-        factory_checked.connect('bind', self._on_factory_bind_checked)
-        factory_checked.connect('unbind', self._on_factory_unbind_checked)
-        factory_checked.connect("teardown", self._on_factory_teardown)        
-        column_checked = Gtk.ColumnViewColumn(title='', factory=factory_checked)
-        column_checked.props.fixed_width = 50
-        self.view.append_column(column_checked)
-        
         self.tags = {}
         self.tag_binded_values = {}
+
+        column_name_builder = TagNameColumnBuilder()
+        self.view.append_column(column_name_builder.column)
+
+        column_check_builder = TagCheckColumnBuilder(self.tag_binded_values, func_toggled_tag)
+        self.view.append_column(column_check_builder.column)        
 
     def append(self, tag_id, name, checked, parent_id=None):
         if parent_id:
