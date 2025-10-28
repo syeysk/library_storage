@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+EXAMPLE_CONFIG_PATH = BASE_DIR / 'config.example.json'
 
 
 class Config:
@@ -18,6 +19,14 @@ class Config:
         self.storage_notes = None
         self.db_path = None
         self.config_path = BASE_DIR / 'config.json'
+
+        if not self.config_path.exists():
+            if (hasattr(EXAMPLE_CONFIG_PATH, 'copy')):
+                EXAMPLE_CONFIG_PATH.copy(self.config_path) # since Python 3.14
+            else:
+                from shutil import copyfile
+                copyfile(EXAMPLE_CONFIG_PATH, self.config_path)
+
         self.load()
     
     def load(self):
