@@ -1,4 +1,4 @@
-<img src="images/title_middle_wide.jpg" height="150"/>
+<img src="images/title_middle_wide.jpg" width="100%"/>
 
 # MediaGarden - Сканер хранилища книг
 
