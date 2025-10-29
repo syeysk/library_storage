@@ -618,6 +618,7 @@ class AppWindow(Gtk.ApplicationWindow):
         self.builder.button_add_tag.connect('clicked', self.tag_tree.action_new_tag)
         self.builder.button_add_child_tag.connect('clicked', self.tag_tree.action_new_child_tag)
         self.builder.button_delete_tag.connect('clicked', self.tag_tree.action_delete_tag)
+        self.builder.search_button.connect('clicked', lambda x: self.update_book_list())
 
         self.build_tags()
         
@@ -629,17 +630,22 @@ class AppWindow(Gtk.ApplicationWindow):
         self.book_list = BookListView(self, self.lib_storage, self.tag_tree.update_tag_count)
         self.builder.books.append(self.book_list.view)
         
+        self.tags = []
+        
         self.update_book_list()
  
     def toggled_tag(self, tag_id, all_tags):
-        self.update_book_list(tags=[str(key) for key, value in all_tags.items() if value])
+        self.tags = [str(key) for key, value in all_tags.items() if value]
+        self.update_book_list()
  
     def update_book_list(self, _=None, tags=None):
+        search = self.builder.search_entry.props.text if self.builder.search_entry.props.text else None
+        tags = self.tags if self.tags else None
         self.book_list.clear()
-        for book_hash, book_id, directory, filename in self.lib_storage.db.select_rows(tags):
+        for book_hash, book_id, directory, filename in self.lib_storage.db.select_rows(tags, search=search):
             self.book_list.append(book_id, Path(directory) / filename)
         
-        self.builder.count_files_found.props.label = str(self.lib_storage.db.select_count(tags))
+        self.builder.count_files_found.props.label = str(self.lib_storage.db.select_count(tags, search=search))
 
     def build_tags(self, parent_id=None):
         parents = []

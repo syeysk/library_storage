@@ -237,13 +237,13 @@ class DBStorage:
         self.c.commit()
         self.seq_sql_params.clear()
     
-    def _sql_builder(self, tags=None, only_deleted=False, order_by='files.filename', only_count=False):
+    def _sql_builder(self, tags=None, only_deleted=False, order_by='files.filename', only_count=False, search=''):
         sql_params = []
         sql = ['SELECT']
         sql_where = []
         
         if only_count:
-            sql.append('COUNT(files.id)')
+            sql.append('COUNT(DISTINCT files.id)')
         else:
             sql.append('files.hash, files.id, files.directory, files.filename')
         
@@ -259,26 +259,28 @@ class DBStorage:
         if only_deleted:
             sql_where.append('files.is_deleted = 1')
 
+        if search:
+            sql_where.append('(files.directory LIKE ? OR files.filename LIKE ?)')
+            sql_params.extend((f'%{search}%', f'%{search}%'))
+
         if sql_where:
             sql.append('WHERE')
             sql.append(' AND '.join(sql_where))
 
-        if only_count:
-            pass #sql.append(f'GROUP BY files.id')
-        else:
+        if not only_count:
             sql.append(f'GROUP BY files.id ORDER BY {order_by} LIMIT ?,?')
 
         return ' '.join(sql), sql_params
 
-    def select_count(self, tags=None, only_deleted=False, order_by='files.filename'):
-        sql, sql_params = self._sql_builder(tags, only_deleted, order_by, True)
-        print(sql, sql_params)
-        return self.cu.execute(sql, sql_params).fetchall()[0][0]
+    def select_count(self, tags=None, only_deleted=False, order_by='files.filename', search=''):
+        sql, sql_params = self._sql_builder(tags, only_deleted, order_by, True, search)
+        rows = self.cu.execute(sql, sql_params).fetchall()
+        return rows[0][0] if rows else 0
 
-    def select_rows(self, tags=None, only_deleted=False, order_by='files.filename'):
+    def select_rows(self, tags=None, only_deleted=False, order_by='files.filename', search=''):
         self.smart_reopen()
-        count = self.select_count(tags, only_deleted, order_by)
-        sql, sql_params = self._sql_builder(tags, only_deleted, order_by, False)
+        count_files = self.select_count(tags, only_deleted, order_by, search)
+        sql, sql_params = self._sql_builder(tags, only_deleted, order_by, False, search)
 
         count_pages = self.get_count_pages()
         for page_num in range(count_pages):

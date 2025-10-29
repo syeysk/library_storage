@@ -37,9 +37,11 @@
     	    <Button id="button_edit_tag" tooltip="Переименовать тег/сохранить">✏️</Button>
 		</Box>
     </Box>
-    <Box>
-	    <Box orientation="HORIZONTAL">
-		    <Label>Файлов найдено:</Label>
+    <Box margin_top="6" margin_end="6" margin_bottom="6">
+	    <Box orientation="HORIZONTAL" margin_bottom="6">
+		    <Entry id="search_entry"></Entry>
+		    <Button id="search_button">Найти</Button>
+		    <Label margin_start="6">Найдено: </Label>
 		    <Label id="count_files_found"></Label>
 		</Box>
 		<ScrolledWindow id="scrolled_books" vexpand="" hexpand="">
