@@ -164,7 +164,7 @@ class DBStorage:
         self.cu.executescript(self.SQL_CREATE_TABLE)
         self.seq_sql_params = []
         self.duplicates_by_hash = {}
-        self.ident = None
+        self.ident = current_thread().ident
 
     def reopen(self):
         """

@@ -1,4 +1,4 @@
-# LibraryStorageScanner - Сканер хранилища книг
+# MediaGarden - Сканер хранилища книг
 
 Минимальная версия Python: 3.11
 

@@ -692,8 +692,8 @@ class AppWindow(Gtk.ApplicationWindow):
 
 class MyApplication(Gtk.Application):
     def __init__(self, lib_storage):
-        super().__init__(application_id='org.syeysk.LibraryStorage')
-        GLib.set_application_name('Library storage scanner')
+        super().__init__(application_id='org.syeysk.MediaGarden')
+        GLib.set_application_name('MediaGarden')
         self.lib_storage = lib_storage
 
         css_provider = Gtk.CssProvider()
@@ -714,7 +714,7 @@ class MyApplication(Gtk.Application):
         #self.set_menubar(builder.get_object('menubar'))
 
     def do_activate(self):
-        window = AppWindow(self.lib_storage, application=self, title='Library storage scanner')
+        window = AppWindow(self.lib_storage, application=self, title='MediaGarden')
         window.present()
 
 

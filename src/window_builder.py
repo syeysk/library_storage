@@ -39,7 +39,7 @@ class WindowBuilder:
             if tag in ('Label', 'Button', 'CheckButton'):
                 kwargs['label'] = node.text
             elif tag == 'Entry':
-                kwargs['text'] = node.text
+                kwargs['text'] = node.text if node.text else ''
             #elif tag == 'EntityColumnView':
             #    kwargs['parent_window'] = self.parent_window
             #    kwargs['item_type'] = globals()[node.attrib.pop('item_type')]
