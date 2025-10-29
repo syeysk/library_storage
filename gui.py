@@ -171,7 +171,6 @@ class BookListView:
         path = Path(book_path)
         item = Book(book_id, path.name, path.parent)
         self.list_store.append(item)
-        self.populate_tags(item)
     
     def delete_tag(self, _, book, tag_id):
         self.lib_storage.db.unassign_tag(tag_id, book.book_id)
@@ -434,6 +433,9 @@ class TagTreeView:
 
     def action_delete_tag(self, _):
         current_tag = self.selection.get_selected_item()
+        if current_tag:
+            return
+
         tag_id = current_tag.tag_id
         parent_id = current_tag.parent_id
         if current_tag:
@@ -475,6 +477,7 @@ class ScanWindow(Gtk.ApplicationWindow):
         
         #self.task_list = TaskListView()
         #self.builder.books.append(self.task_list.view)
+        self.count_new = 0
 
         run_func_in_thread(self.fg_scan)
 
@@ -488,6 +491,18 @@ class ScanWindow(Gtk.ApplicationWindow):
         try:
             (config.storage_books / inserted_filepath).unlink()
             builder.button_inserted.props.sensitive = False
+            builder.button_existed.props.sensitive = False
+        except Exception as error:
+            print(error)
+
+    def action_delete_duplicate_from_base(self, _, builder, inserted_filepath, existed_filepath, file_hash):
+        try:
+            import os.path
+            (config.storage_books / existed_filepath).unlink()
+            dirname, basename = os.path.split(inserted_filepath)
+            self.lib_storage.db.update(file_hash, dirname, basename)
+            builder.button_inserted.props.sensitive = False
+            builder.button_existed.props.sensitive = False
         except Exception as error:
             print(error)
 
@@ -508,13 +523,19 @@ class ScanWindow(Gtk.ApplicationWindow):
 
         if status == STATUS_DUPLICATE:
             builder.button_inserted.connect('clicked', self.action_delete_duplicate, builder, inserted_filepath)
-
-        if status == STATUS_DELETED:
+            builder.button_existed.connect('clicked', self.action_delete_duplicate_from_base, builder, inserted_filepath, existed_filepath, file_hash)
+        elif status == STATUS_DELETED:
             builder.button_delete.connect('clicked', self.action_delete_from_database, builder, file_hash)
+        elif status == STATUS_NEW:
+            self.count_new += 1
+            self.builder.count_new_files.props.label = str(self.count_new)
 
         builder.root_widget.set_name('item-task')
         self.builder.books.append(builder.root_widget)
         #self.task_list.append(status, existed_filepath, inserted_filepath)
+    
+    def func_finished(self):
+        print('Сканирование завершено')
 
     def fg_scan(self):
         self.lib_storage.scan_to_db(
@@ -522,6 +543,7 @@ class ScanWindow(Gtk.ApplicationWindow):
             'original',
             progress_count_scanned_files=self.progress_count_scanned_files,
             progress_current_file=self.progress_current_file,
+            func_finished=self.func_finished,
             func=self.add_file_item,
         )
         self.emit('scan_end')
@@ -616,6 +638,8 @@ class AppWindow(Gtk.ApplicationWindow):
         self.book_list.clear()
         for book_hash, book_id, directory, filename in self.lib_storage.db.select_rows(tags):
             self.book_list.append(book_id, Path(directory) / filename)
+        
+        self.builder.count_files_found.props.label = str(self.lib_storage.db.select_count(tags))
 
     def build_tags(self, parent_id=None):
         parents = []

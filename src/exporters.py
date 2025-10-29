@@ -55,7 +55,7 @@ class MarkdownExporter:
                 id=row[1],
                 hash=row[0],
                 name=row[3].replace('[', '').replace(']', '').replace('(', '').replace(')', ''),
-                relative_storage_pathdir=relpath,
+                relative_storage_pathdir=quote(relpath),
                 pathdir=quote('/{}'.format(row[2])) if row[2] else '',
                 filename=quote(row[3]),
             )

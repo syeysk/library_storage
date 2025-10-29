@@ -5,11 +5,11 @@
 	</Row>
 
 	<Row>
-	    <Label xalign="0">Откуда:</Label>
+	    <Label xalign="0">Откуда: </Label>
 	    <Label id="existed_path" xalign="0"></Label>
 	</Row>
 	<Row>
-	    <Label xalign="0">Куда:</Label>
+	    <Label xalign="0">Куда: </Label>
 	    <Label id="inserted_path" xalign="0"></Label>
 	</Row>
 	<Row>

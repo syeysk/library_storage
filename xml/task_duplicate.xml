@@ -16,7 +16,7 @@
 	    <Label id="existed_path" colspan="2" xalign="0"></Label>
 	</Row>
 	<Row>
-        <Button id="button_existed" sensitive="False">Удалить</Button>
+        <Button id="button_existed">Удалить</Button>
 	    <Label xalign="0">Есть на диске и в базе</Label>
 	</Row>
 </Grid>

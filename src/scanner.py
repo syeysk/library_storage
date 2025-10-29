@@ -14,7 +14,7 @@ STATUS_MOVED_AND_RENAMED = 'Переместили и переименовали
 STATUS_UNTOUCHED = 'Не тронут'
 STATUS_DELETED = 'Удалён'
 STATUS_DUPLICATE = 'Дубликат'
-LIBRARY_IGNORE_EXTENSIONS = ['mp3', 'db', 'db-journal']
+LIBRARY_IGNORE_EXTENSIONS = ['db', 'db-journal']
 
 
 def get_file_hash(file_path):
@@ -35,7 +35,7 @@ class DBStorage:
     SQL_INSERT_ROW = 'INSERT INTO files (hash, directory, filename) VALUES (?, ?, ?)'
     SQL_INSERT_ROW_WITH_ID = 'INSERT INTO files (hash, id, directory, filename) VALUES (?, ?, ?, ?)'
     SQL_SELECT_FILE = 'SELECT directory, filename FROM files WHERE hash=?'
-    SQL_SELECT_COUNT_ROWS = 'SELECT COUNT(id) FROM files WHERE is_deleted = 0'
+    SQL_SELECT_COUNT_ROWS = 'SELECT COUNT(id) FROM files'
     SQL_CREATE_TABLE = '''
         CREATE TABLE IF NOT EXISTS files (
             hash VARCHAR(64) UNIQUE,
@@ -236,12 +236,18 @@ class DBStorage:
 
         self.c.commit()
         self.seq_sql_params.clear()
-
-    def select_rows(self, tags=None, only_deleted=False, order_by='files.filename'):
-        self.smart_reopen()
+    
+    def _sql_builder(self, tags=None, only_deleted=False, order_by='files.filename', only_count=False):
         sql_params = []
-        sql = ['SELECT files.hash, files.id, files.directory, files.filename FROM files']
+        sql = ['SELECT']
         sql_where = []
+        
+        if only_count:
+            sql.append('COUNT(files.id)')
+        else:
+            sql.append('files.hash, files.id, files.directory, files.filename')
+        
+        sql.append('FROM files')
         
         if tags:
             sql.append('JOIN file_tag ON files.id = file_tag.file_id')
@@ -257,8 +263,22 @@ class DBStorage:
             sql.append('WHERE')
             sql.append(' AND '.join(sql_where))
 
-        sql.append(f'GROUP BY files.id ORDER BY {order_by} LIMIT ?,?')
-        sql = ' '.join(sql)
+        if only_count:
+            pass #sql.append(f'GROUP BY files.id')
+        else:
+            sql.append(f'GROUP BY files.id ORDER BY {order_by} LIMIT ?,?')
+
+        return ' '.join(sql), sql_params
+
+    def select_count(self, tags=None, only_deleted=False, order_by='files.filename'):
+        sql, sql_params = self._sql_builder(tags, only_deleted, order_by, True)
+        print(sql, sql_params)
+        return self.cu.execute(sql, sql_params).fetchall()[0][0]
+
+    def select_rows(self, tags=None, only_deleted=False, order_by='files.filename'):
+        self.smart_reopen()
+        count = self.select_count(tags, only_deleted, order_by)
+        sql, sql_params = self._sql_builder(tags, only_deleted, order_by, False)
 
         count_pages = self.get_count_pages()
         for page_num in range(count_pages):
@@ -298,6 +318,7 @@ class DBStorage:
     def update(self, file_hash, inserted_directory, inserted_filename):
         self.smart_reopen()
         self.cu.execute(self.SQL_UPDATE_FILE, (inserted_directory, inserted_filename, file_hash))
+        self.c.commit()
 
 
 class LibraryStorage:
@@ -329,6 +350,7 @@ class LibraryStorage:
             process_dublicate,
             progress_count_scanned_files=None,
             progress_current_file=None,
+            func_finished=None,
             func=None,
     ):
         """Сканирует информацию о файлах в директории и заносит её в базу"""
@@ -373,6 +395,8 @@ class LibraryStorage:
 
         self.db.insert_rows(with_id=False, func=process_file_status)
         self.db.process_deleted_files(func)
+        if func_finished:
+            func_finished()
 
     def export_db(self, exporter, progress_count_exported_files=None) -> None:
         """

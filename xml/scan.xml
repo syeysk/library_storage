@@ -7,7 +7,7 @@
 		</Box>
 		<Box orientation="HORIZONTAL">
 			<Label>Новые:</Label>
-			<Label>0</Label>
+			<Label id="count_new_files">0</Label>
 		</Box>
 		<Label id="current_file" xalign="0"></Label>
 	</Box>
