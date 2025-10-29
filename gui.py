@@ -37,7 +37,22 @@ def run_func_in_thread(func, args=(), kwargs=None, finish_func=None, finish_args
     thread.start()
 
 
-class Book(GObject.Object):
+def open_file_with_default_program(file_path):
+    import os
+    import subprocess
+    import platform
+
+    if platform.system() == "Windows":
+        os.startfile(file_path)
+    elif platform.system() == "Darwin":  # macOS
+        subprocess.run(["open", file_path])
+    elif platform.system() == "Linux":
+        subprocess.run(["xdg-open", file_path])
+    else:
+        print(f"Unsupported operating system: {platform.system()}")
+
+
+class Book(GObject.Object):  # TODO: Rename to File
     __gtype_name__ = 'Book'
     
     def __init__(self, book_id, title, path):
@@ -55,7 +70,7 @@ class Book(GObject.Object):
         return self._path
 
     @GObject.Property(type=str)
-    def title(self):
+    def title(self):  # TODO: Rename to name
         return self._title
 
 
@@ -110,12 +125,21 @@ class BookListView:
 
         builder.root_widget.set_name('item-file')
         builder.title.set_name('item-file-title')
+    
+    def open_file(self, _, item: Book):
+        open_file_with_default_program(config.storage_books / item.path / item.title)
+
+    def open_directory(self, _, item: Book):
+        open_file_with_default_program(config.storage_books / item.path)
         
     def _on_factory_bind(self, factory, list_item):
         cell = list_item.get_child()
         item = list_item.get_item()
         cell.builder.title._binding = item.bind_property('title', cell.builder.title, 'label', GObject.BindingFlags.SYNC_CREATE)
         cell.builder.path._binding = item.bind_property('path', cell.builder.path, 'label', GObject.BindingFlags.SYNC_CREATE)
+        
+        cell.builder.button_open_file.connect('clicked', self.open_file, item)
+        cell.builder.button_open_directory.connect('clicked', self.open_directory, item)
 
         self.book_widgets[item.book_id] = cell
         self.populate_tags(item)

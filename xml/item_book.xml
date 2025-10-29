@@ -2,13 +2,15 @@
 <Grid margin_top="6" margin_start="6" margin_end="6" margin_bottom="6">
 	<Row>
     	<ScrolledWindow hexpand="">
-	    <Label xalign="0" id="title"></Label>
+    	    <Label xalign="0" id="title"></Label>
 		</ScrolledWindow>
+		<Button id="button_open_file" margin_start="6">Open</Button>
 	</Row>
 	<Row>
 	    <Label xalign="0" id="path"></Label>
+		<Button id="button_open_directory" margin_start="6">Open</Button>
 	</Row>
-	<Row>
-		<Box id="tags" orientation="HORIZONTAL"></Box>
+	<Row >
+		<Box id="tags" orientation="HORIZONTAL" colspan="2"></Box>
 	</Row>
 </Grid>
