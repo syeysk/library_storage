@@ -534,6 +534,14 @@ class ScanWindow(Gtk.ApplicationWindow):
         self.lib_storage.db.delete_file(file_hash)
         builder.button_delete.props.sensitive = False
 
+    def action_delete_new_file(self, _, builder, inserted_filepath, file_hash):
+        try:
+            (config.storage_books / inserted_filepath).unlink()
+            self.lib_storage.db.delete_file(file_hash)
+            builder.button_delete.props.sensitive = False        
+        except Exception as error:
+            print(error)
+
     def add_file_item(self, status, existed_filepath, inserted_filepath, file_hash):
         if status == STATUS_UNTOUCHED:
             return
@@ -553,6 +561,7 @@ class ScanWindow(Gtk.ApplicationWindow):
         elif status == STATUS_NEW:
             self.count_new += 1
             self.builder.count_new_files.props.label = str(self.count_new)
+            builder.button_delete.connect('clicked', self.action_delete_new_file, builder, inserted_filepath, file_hash)
 
         builder.root_widget.set_name('item-task')
         self.builder.books.append(builder.root_widget)

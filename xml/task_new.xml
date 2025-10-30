@@ -8,6 +8,6 @@
 	    <Label id="inserted_path" xalign="0"></Label>
 	</Row>
 	<Row>
-        <Button id="button_delete" sensitive="False">Удалить</Button>
+        <Button id="button_delete">Удалить</Button>
 	</Row>
 </Grid>
