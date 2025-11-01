@@ -29,6 +29,9 @@ grid#item-file, grid#item-task {
 label#item-file-title {
     font-size: 16pt;
 }
+#books_list :selected label {
+    color: #000000;
+}
 '''
 
 
@@ -117,7 +120,6 @@ class BookListView:
         cell = builder.root_widget
         cell.builder = builder
 
-        builder.title.props.use_markup = True
         builder.title.props.margin_bottom = 10
         builder.title._binding = None
         builder.path._binding = None
@@ -131,7 +133,12 @@ class BookListView:
 
     def open_directory(self, _, item: Book):
         open_file_with_default_program(config.storage_books / item.path)
-        
+
+    def open_file_window(self, gesture, count, x, y, item):
+        if count == 2:
+            window = FileWindow(self.lib_storage, item, transient_for=self.parent, title='Файл', modal=True)
+            window.present()
+
     def _on_factory_bind(self, factory, list_item):
         cell = list_item.get_child()
         item = list_item.get_item()
@@ -140,6 +147,10 @@ class BookListView:
         
         cell.builder.button_open_file.connect('clicked', self.open_file, item)
         cell.builder.button_open_directory.connect('clicked', self.open_directory, item)
+
+        controller = Gtk.GestureClick.new()
+        controller.connect('pressed', self.open_file_window, item)
+        cell.builder.title.add_controller(controller)
 
         self.book_widgets[item.book_id] = cell
         self.populate_tags(item)
@@ -187,7 +198,8 @@ class BookListView:
         self.list_store = Gio.ListStore(item_type=Book)
         selection = Gtk.SingleSelection(model=self.list_store)
         self.view = Gtk.ListView(model=selection, factory=factory)
-        self.view.connect('activate', self.on_activate_item)
+        #self.view.connect('activate', self.on_activate_item)
+        self.view.set_name('books_list')
 
         self.book_widgets = {}
 
@@ -222,12 +234,10 @@ class BookListView:
         self.list_store.remove_all()
         self.book_widgets.clear()
 
-    def on_activate_item(self, column_view, position):
-        item = self.list_store.get_item(position)
-
 
 class TagNameColumnBuilder:
-    def __init__(self):
+    def __init__(self, lib_storage):
+        self.lib_storage = lib_storage
         factory = Gtk.SignalListItemFactory()
         factory.connect('setup', self._on_factory_setup)
         factory.connect('bind', self._on_factory_bind)
@@ -239,6 +249,7 @@ class TagNameColumnBuilder:
     def _on_factory_setup(self, factory, list_item):
         label = Gtk.Label()
         label.props.xalign = 0
+        label.props.hexpand = True
         label._binding = None
         entry = Gtk.Entry()
         entry.props.xalign = 0
@@ -273,6 +284,28 @@ class TagNameColumnBuilder:
         drag_controller.connect("prepare", self.on_drag_prepare, item)
         drag_controller.connect("drag-begin", self.on_drag_begin, cell)
         cell.add_controller(drag_controller)
+        
+        controller = Gtk.GestureClick.new()
+        controller.connect('pressed', self.start_editing, cell)
+        cell.custom_label.add_controller(controller)
+
+        controller = Gtk.EventControllerKey.new()
+        controller.connect('key_released', self.end_editing, cell, item)
+        cell.custom_entry.add_controller(controller)
+        
+    def start_editing(self, gesture, count, x, y, cell):
+        if count == 2:
+            cell.custom_label.props.visible = False
+            cell.custom_entry.props.visible = True
+
+    def end_editing(self, keyval, keycode, state, modifier, cell, item):
+        if keycode == 65293 and not modifier:
+            new_name = cell.custom_entry.props.text
+            cell.custom_label.props.label = new_name
+            self.lib_storage.db.update_tag(item.tag_id, new_name)
+
+            cell.custom_label.props.visible = True
+            cell.custom_entry.props.visible = False
 
     def _on_factory_unbind(self, factory, list_item):
         cell = list_item.get_child()
@@ -371,25 +404,8 @@ class TagCountColumnBuilder:
         count_files = self.lib_storage.db.select_count_files_by_tag(tag_id)
         label.props.label = str(count_files)
 
-class TagTreeView:
-    def action_toggle_mode(self, _):
-        item = self.selection.get_selected_item()
-        if item is None:
-            return
 
-        label = item.cell.custom_label
-        entry = item.cell.custom_entry
-        if label.props.visible:
-            label.props.visible = False
-            entry.props.visible = True
-        else:
-            new_name = entry.props.text
-            label.props.label = new_name
-            self.lib_storage.db.update_tag(item.tag_id, new_name)
-
-            label.props.visible = True
-            entry.props.visible = False
-    
+class TagTreeView:    
     def get_children(self, item):
         if isinstance(item, Tag):
             return item.get_children()
@@ -408,7 +424,7 @@ class TagTreeView:
         self.tag_binded_values = {}
         self.update_count_funces = {}
 
-        column_name_builder = TagNameColumnBuilder()
+        column_name_builder = TagNameColumnBuilder(self.lib_storage)
         self.view.append_column(column_name_builder.column)
 
         column_check_builder = TagCheckColumnBuilder(self.tag_binded_values, func_toggled_tag)
@@ -498,9 +514,7 @@ class ScanWindow(Gtk.ApplicationWindow):
 
         self.builder = WindowBuilder(XML_DIR / 'scan.xml', {})
         self.set_child(self.builder.root_widget)
-        
-        #self.task_list = TaskListView()
-        #self.builder.books.append(self.task_list.view)
+ 
         self.count_new = 0
 
         run_func_in_thread(self.fg_scan)
@@ -565,7 +579,6 @@ class ScanWindow(Gtk.ApplicationWindow):
 
         builder.root_widget.set_name('item-task')
         self.builder.books.append(builder.root_widget)
-        #self.task_list.append(status, existed_filepath, inserted_filepath)
     
     def func_finished(self):
         print('Сканирование завершено')
@@ -581,6 +594,42 @@ class ScanWindow(Gtk.ApplicationWindow):
         )
         self.emit('scan_end')
 
+
+class FileWindow(Gtk.ApplicationWindow):
+    def __init__(self, lib_storage, item, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.lib_storage = lib_storage
+        self.item = item
+
+        self.builder = WindowBuilder(XML_DIR / 'file_window.xml', {})
+        self.set_child(self.builder.root_widget)
+        
+        self.note_name = f'книга_{item.book_id}.md'
+        self.note_path = config.storage_notes / self.note_name
+
+        self.builder.file_name.set_name('item-file-title')
+        self.builder.file_name.props.label = item.title
+        self.builder.file_path.props.label = str(item.path)
+        
+        self.builder.open_note.connect('clicked', self.open_note)
+        self.builder.create_note.connect('clicked', self.create_note)
+        if self.note_path.exists():
+            self.builder.create_note.props.visible = False
+            self.builder.open_note.props.visible = True
+        else:
+            self.builder.create_note.props.visible = True
+            self.builder.open_note.props.visible = False
+
+    def open_note(self, _):
+        open_file_with_default_program(f'obsidian://open?file={self.note_name}')
+
+    def create_note(self, _):
+        if not self.note_path.exists():
+            with self.note_path.open('w', encoding='utf-8') as note_file:
+                note_file.write(f'# {self.item.title}\n')
+
+        self.builder.create_note.props.visible = False
+        self.builder.open_note.props.visible = True
 
 class ExportWindow(Gtk.ApplicationWindow):
     def __init__(self, lib_storage, *args, **kwargs):
@@ -647,7 +696,6 @@ class AppWindow(Gtk.ApplicationWindow):
         
         self.tag_tree = TagTreeView(self.lib_storage, self.toggled_tag)
         self.builder.tags.append(self.tag_tree.view)
-        self.builder.button_edit_tag.connect('clicked', self.tag_tree.action_toggle_mode)
         self.builder.button_add_tag.connect('clicked', self.tag_tree.action_new_tag)
         self.builder.button_add_child_tag.connect('clicked', self.tag_tree.action_new_child_tag)
         self.builder.button_delete_tag.connect('clicked', self.tag_tree.action_delete_tag)

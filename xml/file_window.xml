@@ -1,0 +1,13 @@
+<?xml version="1.1" encoding="UTF-8" ?>
+<Grid margin_top="6" margin_start="6" margin_end="6" margin_bottom="6">
+	<Row>
+	    <Label xalign="0" id="file_name" colspan="2"></Label>
+	</Row>
+	<Row>
+	    <Label xalign="0" id="file_path" colspan="2"></Label>
+	</Row>
+	<Row>
+	    <Button id="open_note" margin_top="10">Открыть заметку</Button>
+	    <Button id="create_note" margin_top="10">Создать заметку</Button>
+	</Row>
+</Grid>
